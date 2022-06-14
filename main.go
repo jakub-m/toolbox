@@ -1,22 +1,28 @@
 package main
 
 import (
-	"flag"
+	"bufio"
 	"fmt"
 	"log"
+	"os"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 func main() {
-	flag.Parse()
-	rawExpression := strings.Join(flag.Args(), " ")
-	result, err := calcuate(rawExpression)
-	if err != nil {
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		text := scanner.Text()
+		res, err := calcuate(text)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(res)
+	}
+	if err := scanner.Err(); err != nil {
 		log.Fatalf("error: %v", err)
 	}
-	fmt.Println(result)
+
 }
 
 func calcuate(expr string) (string, error) {
