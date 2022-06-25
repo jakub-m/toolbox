@@ -5,30 +5,40 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
 func main() {
-	fields := ""
+	selectorSpec := ""
 	shouldCut := false
-	flag.StringVar(&fields, "f", "", "select only those fields")
+	debug := false
+	flag.StringVar(&selectorSpec, "f", "", "select only those fields")
 	flag.BoolVar(&shouldCut, "x", false, "print selected values, not full lines")
+	flag.BoolVar(&debug, "v", false, "verbose debug mode")
 	flag.Parse()
 
-	if fields == "" {
+	if selectorSpec == "" {
 		log.Fatalln("no fields selected")
+	}
+
+	setDebug(debug)
+	stringSelectors, err := selectorSpecToStringSelectors(selectorSpec)
+	setDebug(true)
+
+	if err != nil {
+		log.Fatalln("bad field specifier:", err)
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	selector := selector{
-		previous: nil,
-		stringSelectors: []stringSliceSelector{
-			selectFrom(1),
-		},
-		shouldCut: shouldCut,
+		previous:        nil,
+		stringSelectors: stringSelectors,
+		shouldCut:       shouldCut,
 	}
 	for scanner.Scan() {
 		selector = selector.selectUnique(scanner.Text(), os.Stdout)
@@ -71,13 +81,53 @@ type stringSliceSelector interface {
 	selectValues([]string) []string
 }
 
+func selectorSpecToStringSelectors(selectorSpec string) ([]stringSliceSelector, error) {
+	selectors := []stringSliceSelector{}
+	for _, singleSpec := range strings.Split(selectorSpec, ",") {
+		somethingSelected := false
+		type factory func(string) (stringSliceSelector, error)
+		for _, fac := range []factory{
+			specToSelectFrom,
+		} {
+			if selector, err := fac(singleSpec); err == nil {
+				selectors = append(selectors, selector)
+				somethingSelected = true
+				break
+			} else {
+				log.Println(err)
+			}
+		}
+		if !somethingSelected {
+			return nil, fmt.Errorf("invalid field spec \"%s\"", singleSpec)
+		}
+	}
+	return selectors, nil
+}
+
 type selectFrom int
 
+func specToSelectFrom(spec string) (stringSliceSelector, error) {
+	re := regexp.MustCompile(`^(\d+)-$`)
+	submatch := re.FindStringSubmatch(spec)
+	if submatch == nil {
+		return selectFrom(-1), fmt.Errorf("bad spec: %s", spec)
+	}
+	val, err := strconv.Atoi(submatch[1])
+	if err != nil {
+		return selectFrom(-1), fmt.Errorf("bad spec, not a number: %s", spec)
+	}
+	if val < 1 {
+		return selectFrom(-1), fmt.Errorf("bad spec, must be at least 1: %s", spec)
+	}
+	return selectFrom(val), nil
+}
+
 func (s selectFrom) selectValues(values []string) []string {
-	if len(values) < int(s) {
+        i := int(s) - 1
+	if len(values) < i {
 		return []string{}
 	}
-	return values[s:]
+	return values[i:]
 }
 
 var _ stringSliceSelector = (*selectFrom)(nil)
@@ -92,4 +142,12 @@ func slicesEqual[T comparable](some, other []T) bool {
 		}
 	}
 	return true
+}
+
+func setDebug(enabled bool) {
+	if enabled {
+		log.SetOutput(ioutil.Discard)
+	} else {
+		log.SetOutput(os.Stderr)
+	}
 }
