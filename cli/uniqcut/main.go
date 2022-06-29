@@ -11,28 +11,47 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 func main() {
 	selectorSpec := ""
 	shouldCut := false
 	debug := false
-	flag.StringVar(&selectorSpec, "f", "", "select only those fields")
-	flag.BoolVar(&shouldCut, "x", false, "print selected values, not full lines")
-	flag.BoolVar(&debug, "v", false, "verbose debug mode")
+	separator := ""
+	flag.StringVar(&selectorSpec, "f", "1-", "Select only those fields. Example: `1-`, `2-,1-`.")
+	flag.StringVar(&separator, "d", "", "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
+	flag.BoolVar(&shouldCut, "x", false, "Print selected values, not full lines.")
+	flag.BoolVar(&debug, "v", false, "Verbose debug mode.")
 	flag.Parse()
 
 	if selectorSpec == "" {
-		log.Fatalln("no fields selected")
+		fatalln("no fields selected")
 	}
 
 	setDebug(debug)
 	stringSelectors, err := selectorSpecToStringSelectors(selectorSpec)
-	setDebug(true)
+	//setDebug(true)
 
 	if err != nil {
-		log.Fatalln("bad field specifier:", err)
+		fatalln("bad field specifier:", err)
 	}
+
+	//var delimiterRegex :=
+	var splitter splitterFunc
+
+	switch n := utf8.RuneCountInString(separator); {
+	case n == 0:
+		whitespace := regexp.MustCompile(`\s+`)
+		splitter = func(s string) []string {
+			return whitespace.Split(s, -1)
+		}
+	default:
+		splitter = func(s string) []string {
+			return strings.Split(s, separator)
+		}
+	}
+	//parts := delim.Split(text, -1)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	selector := selector{
@@ -41,14 +60,16 @@ func main() {
 		shouldCut:       shouldCut,
 	}
 	for scanner.Scan() {
-		selector = selector.selectUnique(scanner.Text(), os.Stdout)
+		selector = selector.selectUnique(scanner.Text(), splitter, os.Stdout)
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+		fatalln(err)
 	}
 
 }
+
+type splitterFunc func(string) []string
 
 type selector struct {
 	previous        []string
@@ -56,10 +77,8 @@ type selector struct {
 	shouldCut       bool
 }
 
-var reSpaces = regexp.MustCompile(`\s+`)
-
-func (s selector) selectUnique(text string, w io.Writer) selector {
-	parts := reSpaces.Split(text, -1)
+func (s selector) selectUnique(text string, splitter splitterFunc, w io.Writer) selector {
+	parts := splitter(text)
 	log.Println(text, parts)
 	selected := []string{}
 	for _, ssel := range s.stringSelectors {
@@ -123,7 +142,7 @@ func specToSelectFrom(spec string) (stringSliceSelector, error) {
 }
 
 func (s selectFrom) selectValues(values []string) []string {
-        i := int(s) - 1
+	i := int(s) - 1
 	if len(values) < i {
 		return []string{}
 	}
@@ -146,8 +165,14 @@ func slicesEqual[T comparable](some, other []T) bool {
 
 func setDebug(enabled bool) {
 	if enabled {
-		log.SetOutput(ioutil.Discard)
-	} else {
 		log.SetOutput(os.Stderr)
+	} else {
+		log.SetOutput(ioutil.Discard)
 	}
+}
+
+func fatalln(message ...any) {
+	// don't use log.Fatal because it would display only in debug mode.
+	fmt.Fprintln(os.Stderr, message...)
+	os.Exit(1)
 }
