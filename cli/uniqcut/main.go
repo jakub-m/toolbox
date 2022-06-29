@@ -19,7 +19,7 @@ func main() {
 	shouldCut := false
 	debug := false
 	separator := ""
-	flag.StringVar(&selectorSpec, "f", "1-", "Select only those fields. Example: `1-`, `2-,1-`.")
+	flag.StringVar(&selectorSpec, "f", "1-", "Select only those fields. Example: `1-`, `-2,4-`.")
 	flag.StringVar(&separator, "d", "", "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
 	flag.BoolVar(&shouldCut, "x", false, "Print selected values, not full lines.")
 	flag.BoolVar(&debug, "v", false, "Verbose debug mode.")
@@ -107,6 +107,7 @@ func selectorSpecToStringSelectors(selectorSpec string) ([]stringSliceSelector, 
 		type factory func(string) (stringSliceSelector, error)
 		for _, fac := range []factory{
 			specToSelectFrom,
+			specToSelectTo,
 		} {
 			if selector, err := fac(singleSpec); err == nil {
 				selectors = append(selectors, selector)
@@ -150,6 +151,36 @@ func (s selectFrom) selectValues(values []string) []string {
 }
 
 var _ stringSliceSelector = (*selectFrom)(nil)
+
+type selectTo int
+
+func specToSelectTo(spec string) (stringSliceSelector, error) {
+	re := regexp.MustCompile(`^-(\d+)$`)
+	submatch := re.FindStringSubmatch(spec)
+	if submatch == nil {
+		return selectTo(-1), fmt.Errorf("bad spec: %s", spec)
+	}
+	val, err := strconv.Atoi(submatch[1])
+	if err != nil {
+		return selectTo(-1), fmt.Errorf("bad spec, not a number: %s", spec)
+	}
+	if val < 1 {
+		return selectTo(-1), fmt.Errorf("bad spec, must be at least 1: %s", spec)
+	}
+	return selectTo(val), nil
+}
+
+func (s selectTo) selectValues(values []string) []string {
+	if s < 1 {
+		return []string{}
+	}
+	if len(values) < int(s) {
+		return values
+	}
+	return values[:s]
+}
+
+var _ stringSliceSelector = (*selectTo)(nil)
 
 func slicesEqual[T comparable](some, other []T) bool {
 	if len(some) != len(other) {
