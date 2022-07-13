@@ -13,6 +13,11 @@ import (
 func main() {
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "verbose, useful debug")
+	flag.Usage = func() {
+		fmt.Println("Parse cloud log in JSON format and output nice readable log lines.")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
 	flag.Parse()
 	if !verbose {
 		log.SetOutput(ioutil.Discard)
