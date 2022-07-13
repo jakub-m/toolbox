@@ -13,6 +13,7 @@ import (
 func main() {
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "verbose, useful debug")
+	flag.Parse()
 	if !verbose {
 		log.SetOutput(ioutil.Discard)
 	}
