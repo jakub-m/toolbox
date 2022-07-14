@@ -14,30 +14,43 @@ import (
 	"unicode/utf8"
 )
 
+type options struct {
+	selectorSpec string
+	shouldCut    bool
+	debug        bool
+	separator    string
+	showCount    bool
+}
+
 func main() {
-	selectorSpec := "1-"
-	shouldCut := false
-	debug := false
-	separator := ""
-	showCount := false
-	flag.StringVar(&selectorSpec, "f", selectorSpec, "Select only those fields. Example: `1-`, `-2,3,4-`.")
-	flag.StringVar(&separator, "d", separator, "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
-	flag.BoolVar(&shouldCut, "x", shouldCut, "Print selected values, not full lines.")
-	flag.BoolVar(&debug, "v", debug, "Verbose debug mode.")
-	flag.BoolVar(&showCount, "c", showCount, "Prefix lines by number of occurances.")
+	opts := options{
+		selectorSpec: "1-",
+		shouldCut:    false,
+		debug:        false,
+		separator:    "",
+		showCount:    false,
+	}
+	flag.StringVar(&opts.selectorSpec, "f", opts.selectorSpec, "Select only those fields. Example: `1-`, `-2,3,4-`.")
+	flag.StringVar(&opts.separator, "d", opts.separator, "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
+	flag.BoolVar(&opts.shouldCut, "x", opts.shouldCut, "Print selected values, not full lines.")
+	flag.BoolVar(&opts.debug, "v", opts.debug, "Verbose debug mode.")
+	flag.BoolVar(&opts.showCount, "c", opts.showCount, "Prefix lines by number of occurances.")
 	flag.Usage = func() {
 		fmt.Println(`Utility that combines uniq with cut. It returns unique lines but taking into account only fragments of the input.`)
 		flag.PrintDefaults()
 		os.Exit(0)
 	}
 	flag.Parse()
+	mainInternal(opts, os.Stdin, os.Stdout)
+}
 
-	if selectorSpec == "" {
+func mainInternal(opts options, in io.Reader, out io.Writer) {
+	if opts.selectorSpec == "" {
 		fatalln("no fields selected")
 	}
 
-	setDebug(debug)
-	stringSelectors, err := selectorSpecToStringSelectors(selectorSpec)
+	setDebug(opts.debug)
+	stringSelectors, err := selectorSpecToStringSelectors(opts.selectorSpec)
 
 	if err != nil {
 		fatalln("bad field specifier:", err)
@@ -45,7 +58,7 @@ func main() {
 
 	var splitter splitterFunc
 
-	switch n := utf8.RuneCountInString(separator); {
+	switch n := utf8.RuneCountInString(opts.separator); {
 	case n == 0:
 		whitespace := regexp.MustCompile(`\s+`)
 		splitter = func(s string) []string {
@@ -53,25 +66,24 @@ func main() {
 		}
 	default:
 		splitter = func(s string) []string {
-			return strings.Split(s, separator)
+			return strings.Split(s, opts.separator)
 		}
 	}
 
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(in)
 	selector := selector{
 		previous:        nil,
 		stringSelectors: stringSelectors,
-		showSelected:    shouldCut,
-		showCount:       showCount,
+		showSelected:    opts.shouldCut,
+		showCount:       opts.showCount,
 	}
 	for scanner.Scan() {
-		selector = selector.selectUnique(scanner.Text(), splitter, os.Stdout)
+		selector = selector.selectUnique(scanner.Text(), splitter, out)
 	}
 
 	if err := scanner.Err(); err != nil {
 		fatalln(err)
 	}
-
 }
 
 type splitterFunc func(string) []string
