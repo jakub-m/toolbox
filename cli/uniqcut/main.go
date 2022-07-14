@@ -15,14 +15,16 @@ import (
 )
 
 func main() {
-	selectorSpec := ""
+	selectorSpec := "1-"
 	shouldCut := false
 	debug := false
 	separator := ""
-	flag.StringVar(&selectorSpec, "f", "1-", "Select only those fields. Example: `1-`, `-2,3,4-`.")
-	flag.StringVar(&separator, "d", "", "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
-	flag.BoolVar(&shouldCut, "x", false, "Print selected values, not full lines.")
-	flag.BoolVar(&debug, "v", false, "Verbose debug mode.")
+	showCount := false
+	flag.StringVar(&selectorSpec, "f", selectorSpec, "Select only those fields. Example: `1-`, `-2,3,4-`.")
+	flag.StringVar(&separator, "d", separator, "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
+	flag.BoolVar(&shouldCut, "x", shouldCut, "Print selected values, not full lines.")
+	flag.BoolVar(&debug, "v", debug, "Verbose debug mode.")
+	flag.BoolVar(&showCount, "c", showCount, "Prefix lines by number of occurances.")
 	flag.Usage = func() {
 		fmt.Println(`Utility that combines uniq with cut. It returns unique lines but taking into account only fragments of the input.`)
 		flag.PrintDefaults()
@@ -36,13 +38,11 @@ func main() {
 
 	setDebug(debug)
 	stringSelectors, err := selectorSpecToStringSelectors(selectorSpec)
-	//setDebug(true)
 
 	if err != nil {
 		fatalln("bad field specifier:", err)
 	}
 
-	//var delimiterRegex :=
 	var splitter splitterFunc
 
 	switch n := utf8.RuneCountInString(separator); {
@@ -56,13 +56,13 @@ func main() {
 			return strings.Split(s, separator)
 		}
 	}
-	//parts := delim.Split(text, -1)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	selector := selector{
 		previous:        nil,
 		stringSelectors: stringSelectors,
-		shouldCut:       shouldCut,
+		showSelected:    shouldCut,
+		showCount:       showCount,
 	}
 	for scanner.Scan() {
 		selector = selector.selectUnique(scanner.Text(), splitter, os.Stdout)
@@ -79,7 +79,9 @@ type splitterFunc func(string) []string
 type selector struct {
 	previous        []string
 	stringSelectors []stringSliceSelector
-	shouldCut       bool
+	showSelected    bool
+	showCount       bool
+	uniqLineCount   int
 }
 
 func (s selector) selectUnique(text string, splitter splitterFunc, w io.Writer) selector {
@@ -92,11 +94,19 @@ func (s selector) selectUnique(text string, splitter splitterFunc, w io.Writer) 
 
 	if s.previous == nil || !slicesEqual(s.previous, selected) {
 		s.previous = selected
-		if s.shouldCut {
-			fmt.Fprintln(w, strings.Join(selected, "\t"))
+		textToDisplay := ""
+		if s.showSelected {
+			textToDisplay = strings.Join(selected, "\t")
 		} else {
-			fmt.Fprintln(w, text)
+			textToDisplay = text
 		}
+		if s.showCount {
+			textToDisplay = fmt.Sprintf("%d\t%s", s.uniqLineCount+1, textToDisplay)
+		}
+		fmt.Fprintln(w, textToDisplay)
+		s.uniqLineCount = 0
+	} else {
+		s.uniqLineCount++
 	}
 	return s
 }
