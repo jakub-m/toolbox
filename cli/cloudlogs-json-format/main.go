@@ -12,7 +12,9 @@ import (
 
 func main() {
 	var verbose bool
+	var textOnly bool
 	flag.BoolVar(&verbose, "v", false, "verbose, useful debug")
+	flag.BoolVar(&textOnly, "m", false, "message text only")
 	flag.Usage = func() {
 		fmt.Println("Parse cloud log in JSON format and output nice readable log lines.")
 		flag.PrintDefaults()
@@ -33,7 +35,7 @@ func main() {
 	log.Println("unmarshalled objects:", len(objects))
 	formatErrorCount := 0
 	for _, obj := range objects {
-		if s, err := format(obj); err == nil {
+		if s, err := format(obj, textOnly); err == nil {
 			fmt.Println(s)
 		} else {
 			log.Println("format:", err)
@@ -78,14 +80,14 @@ func unmarshallSingle(raw []byte) (any, error) {
 	return obj, err
 }
 
-func format(obj any) (string, error) {
-	if s, err := formatCloudLog(obj); err == nil {
+func format(obj any, textOnly bool) (string, error) {
+	if s, err := formatCloudLog(obj, textOnly); err == nil {
 		return s, nil
 	}
 	return "", fmt.Errorf("cannot format")
 }
 
-func formatCloudLog(obj any) (string, error) {
+func formatCloudLog(obj any, textOnly bool) (string, error) {
 	receiveTimestamp, err := getField(obj, "receiveTimestamp")
 	if err != nil {
 		return "", err
@@ -104,7 +106,13 @@ func formatCloudLog(obj any) (string, error) {
 	} else {
 		text = fmt.Sprint(message)
 	}
-	return fmt.Sprintf("%s\t%s\t%s", receiveTimestamp, severity, text), nil
+	outputLine := ""
+	if textOnly {
+		outputLine = text
+	} else {
+		outputLine = fmt.Sprintf("%s\t%s\t%s", receiveTimestamp, severity, text)
+	}
+	return outputLine, nil
 }
 
 func getField(obj any, keys ...string) (any, error) {
