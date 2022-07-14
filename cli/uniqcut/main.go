@@ -19,10 +19,15 @@ func main() {
 	shouldCut := false
 	debug := false
 	separator := ""
-	flag.StringVar(&selectorSpec, "f", "1-", "Select only those fields. Example: `1-`, `-2,4-`.")
+	flag.StringVar(&selectorSpec, "f", "1-", "Select only those fields. Example: `1-`, `-2,3,4-`.")
 	flag.StringVar(&separator, "d", "", "Delimiter string (not a regex). If left unset then consecutive whitespace is used.")
 	flag.BoolVar(&shouldCut, "x", false, "Print selected values, not full lines.")
 	flag.BoolVar(&debug, "v", false, "Verbose debug mode.")
+	flag.Usage = func() {
+		fmt.Println(`Utility that combines uniq with cut. It returns unique lines but taking into account only fragments of the input.`)
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
 	flag.Parse()
 
 	if selectorSpec == "" {
@@ -107,6 +112,7 @@ func selectorSpecToStringSelectors(selectorSpec string) ([]stringSliceSelector, 
 		type factory func(string) (stringSliceSelector, error)
 		for _, fac := range []factory{
 			specToSelectFrom,
+			specToSelectExact,
 			specToSelectTo,
 		} {
 			if selector, err := fac(singleSpec); err == nil {
@@ -151,6 +157,34 @@ func (s selectFrom) selectValues(values []string) []string {
 }
 
 var _ stringSliceSelector = (*selectFrom)(nil)
+
+type selectExact int
+
+func specToSelectExact(spec string) (stringSliceSelector, error) {
+	re := regexp.MustCompile(`^(\d+)$`)
+	submatch := re.FindStringSubmatch(spec)
+	if submatch == nil {
+		return selectFrom(-1), fmt.Errorf("bad spec: %s", spec)
+	}
+	val, err := strconv.Atoi(submatch[1])
+	if err != nil {
+		return selectFrom(-1), fmt.Errorf("bad spec, not a number: %s", spec)
+	}
+	if val < 1 {
+		return selectFrom(-1), fmt.Errorf("bad spec, must be at least 1: %s", spec)
+	}
+	return selectExact(val), nil
+}
+
+func (s selectExact) selectValues(values []string) []string {
+	i := int(s) - 1
+	if len(values) <= i {
+		return []string{}
+	}
+	return []string{values[i]}
+}
+
+var _ stringSliceSelector = (*selectExact)(nil)
 
 type selectTo int
 
