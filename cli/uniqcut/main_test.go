@@ -9,24 +9,42 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUniq(t *testing.T) {
+func TestUniqSimple(t *testing.T) {
 	var out bytes.Buffer
-	mainInternal(options{
+	mainInternal(args{
 		selectorSpec: "2",
-		separator:    "",
-		showCount:    false,
 	}, reader(`
-1 foo
-2 foo
-3 bar
-4 bar 
-5 bar
-6 quux
+a foo
+b foo
+c bar
+d bar 
+e bar
+f quux
 `), io.Writer(&out))
 	assert.Equal(t, ltrim(`
-1 foo
-3 bar
-6 quux
+a foo
+c bar
+f quux
+`), out.String())
+}
+
+func TestUniqCount(t *testing.T) {
+	var out bytes.Buffer
+	mainInternal(args{
+		selectorSpec: "2",
+		showCount:    true,
+	}, reader(`
+a foo
+b foo
+c bar
+d bar 
+e bar
+f quux
+`), io.Writer(&out))
+	assert.Equal(t, ltrim(`
+2	a foo
+3	c bar
+1	f quux
 `), out.String())
 }
 

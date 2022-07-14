@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 )
 
-type options struct {
+type args struct {
 	selectorSpec string
 	shouldCut    bool
 	debug        bool
@@ -23,7 +23,7 @@ type options struct {
 }
 
 func main() {
-	opts := options{
+	opts := args{
 		selectorSpec: "1-",
 		shouldCut:    false,
 		debug:        false,
@@ -44,13 +44,13 @@ func main() {
 	mainInternal(opts, os.Stdin, os.Stdout)
 }
 
-func mainInternal(opts options, in io.Reader, out io.Writer) {
-	if opts.selectorSpec == "" {
+func mainInternal(args args, in io.Reader, out io.Writer) {
+	if args.selectorSpec == "" {
 		fatalln("no fields selected")
 	}
 
-	setDebug(opts.debug)
-	stringSelectors, err := selectorSpecToStringSelectors(opts.selectorSpec)
+	setDebug(args.debug)
+	stringSelectors, err := selectorSpecToStringSelectors(args.selectorSpec)
 
 	if err != nil {
 		fatalln("bad field specifier:", err)
@@ -58,7 +58,7 @@ func mainInternal(opts options, in io.Reader, out io.Writer) {
 
 	var splitter splitterFunc
 
-	switch n := utf8.RuneCountInString(opts.separator); {
+	switch n := utf8.RuneCountInString(args.separator); {
 	case n == 0:
 		whitespace := regexp.MustCompile(`\s+`)
 		splitter = func(s string) []string {
@@ -66,7 +66,7 @@ func mainInternal(opts options, in io.Reader, out io.Writer) {
 		}
 	default:
 		splitter = func(s string) []string {
-			return strings.Split(s, opts.separator)
+			return strings.Split(s, args.separator)
 		}
 	}
 
@@ -74,8 +74,8 @@ func mainInternal(opts options, in io.Reader, out io.Writer) {
 	selector := selector{
 		previous:        nil,
 		stringSelectors: stringSelectors,
-		showSelected:    opts.shouldCut,
-		showCount:       opts.showCount,
+		showSelected:    args.shouldCut,
+		showCount:       args.showCount,
 	}
 	for scanner.Scan() {
 		selector = selector.selectUnique(scanner.Text(), splitter, out)
