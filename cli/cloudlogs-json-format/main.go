@@ -31,12 +31,18 @@ func main() {
 		fatalln("unmarshall:", err)
 	}
 	log.Println("unmarshalled objects:", len(objects))
+	formatErrorCount := 0
 	for _, obj := range objects {
 		if s, err := format(obj); err == nil {
 			fmt.Println(s)
 		} else {
 			log.Println("format:", err)
+			formatErrorCount++
 		}
+	}
+	log.Println("format error count:", formatErrorCount)
+	if formatErrorCount > 0 {
+		fmt.Fprintf(os.Stderr, "There were %d format error(s)\n", formatErrorCount)
 	}
 }
 
@@ -73,13 +79,13 @@ func unmarshallSingle(raw []byte) (any, error) {
 }
 
 func format(obj any) (string, error) {
-	if s, err := formatCloudLogWithJsonPayload(obj); err == nil {
+	if s, err := formatCloudLog(obj); err == nil {
 		return s, nil
 	}
 	return "", fmt.Errorf("cannot format")
 }
 
-func formatCloudLogWithJsonPayload(obj any) (string, error) {
+func formatCloudLog(obj any) (string, error) {
 	receiveTimestamp, err := getField(obj, "receiveTimestamp")
 	if err != nil {
 		return "", err
@@ -88,11 +94,17 @@ func formatCloudLogWithJsonPayload(obj any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	message, err := getField(obj, "jsonPayload", "message")
-	if err != nil {
-		return "", err
+	text := ""
+	if message, err := getField(obj, "jsonPayload", "message"); err != nil {
+		if textPayload, err := getField(obj, "textPayload"); err != nil {
+			return "", err
+		} else {
+			text = fmt.Sprint(textPayload)
+		}
+	} else {
+		text = fmt.Sprint(message)
 	}
-	return fmt.Sprintf("%s\t%s\t%s", receiveTimestamp, severity, message), nil
+	return fmt.Sprintf("%s\t%s\t%s", receiveTimestamp, severity, text), nil
 }
 
 func getField(obj any, keys ...string) (any, error) {
