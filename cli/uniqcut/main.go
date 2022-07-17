@@ -71,6 +71,8 @@ func mainInternal(args args, in io.Reader, out io.Writer) {
 	}
 
 	scanner := bufio.NewScanner(in)
+	buf := make([]byte, 0, 1024)
+	scanner.Buffer(buf, 1024*1024) // set max line length to 1MB, otherwise will get "bufio.Scanner: token too long"
 	selector := selector{
 		prevSelected:    nil,
 		stringSelectors: stringSelectors,
