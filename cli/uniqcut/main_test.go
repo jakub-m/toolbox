@@ -22,8 +22,8 @@ e bar
 f quux
 `), io.Writer(&out))
 	assert.Equal(t, ltrim(`
-a foo
-c bar
+b foo
+e bar
 f quux
 `), out.String())
 }
@@ -35,15 +35,14 @@ func TestUniqCount(t *testing.T) {
 		showCount:    true,
 	}, reader(`
 a foo
-b foo
 c bar
 d bar 
 e bar
 f quux
 `), io.Writer(&out))
 	assert.Equal(t, ltrim(`
-2	a foo
-3	c bar
+1	a foo
+3	e bar
 1	f quux
 `), out.String())
 }

@@ -72,14 +72,16 @@ func mainInternal(args args, in io.Reader, out io.Writer) {
 
 	scanner := bufio.NewScanner(in)
 	selector := selector{
-		previous:        nil,
+		prevSelected:    nil,
 		stringSelectors: stringSelectors,
 		showSelected:    args.shouldCut,
 		showCount:       args.showCount,
+		out:             out,
 	}
 	for scanner.Scan() {
-		selector = selector.selectUnique(scanner.Text(), splitter, out)
+		selector = selector.selectUnique(scanner.Text(), splitter)
 	}
+	selector.finish()
 
 	if err := scanner.Err(); err != nil {
 		fatalln(err)
@@ -89,38 +91,50 @@ func mainInternal(args args, in io.Reader, out io.Writer) {
 type splitterFunc func(string) []string
 
 type selector struct {
-	previous        []string
+	prevLine        string
+	prevSelected    []string
 	stringSelectors []stringSliceSelector
 	showSelected    bool
 	showCount       bool
 	uniqLineCount   int
+	out             io.Writer
 }
 
-func (s selector) selectUnique(text string, splitter splitterFunc, w io.Writer) selector {
-	parts := splitter(text)
-	log.Println(text, parts)
+func (s selector) selectUnique(line string, splitter splitterFunc) selector {
+	parts := splitter(line)
+	log.Println(line, parts)
 	selected := []string{}
 	for _, ssel := range s.stringSelectors {
 		selected = append(selected, ssel.selectValues(parts)...)
 	}
 
-	if s.previous == nil || !slicesEqual(s.previous, selected) {
-		s.previous = selected
-		textToDisplay := ""
-		if s.showSelected {
-			textToDisplay = strings.Join(selected, "\t")
-		} else {
-			textToDisplay = text
-		}
-		if s.showCount {
-			textToDisplay = fmt.Sprintf("%d\t%s", s.uniqLineCount+1, textToDisplay)
-		}
-		fmt.Fprintln(w, textToDisplay)
-		s.uniqLineCount = 0
+	prevDiffers := s.prevSelected != nil && !slicesEqual(s.prevSelected, selected)
+	if prevDiffers {
+		s.print()
+		s.uniqLineCount = 1
 	} else {
 		s.uniqLineCount++
 	}
+	s.prevSelected = selected
+	s.prevLine = line
 	return s
+}
+
+func (s selector) finish() {
+	s.print()
+}
+
+func (s selector) print() {
+	textToDisplay := ""
+	if s.showSelected {
+		textToDisplay = strings.Join(s.prevSelected, "\t")
+	} else {
+		textToDisplay = s.prevLine
+	}
+	if s.showCount {
+		textToDisplay = fmt.Sprintf("%d\t%s", s.uniqLineCount, textToDisplay)
+	}
+	fmt.Fprintln(s.out, textToDisplay)
 }
 
 type stringSliceSelector interface {
