@@ -88,7 +88,7 @@ func format(obj any, textOnly bool) (string, error) {
 }
 
 func formatCloudLog(obj any, textOnly bool) (string, error) {
-	receiveTimestamp, err := getField(obj, "receiveTimestamp")
+	timestamp, err := getField(obj, "timestamp")
 	if err != nil {
 		return "", err
 	}
@@ -110,7 +110,7 @@ func formatCloudLog(obj any, textOnly bool) (string, error) {
 	if textOnly {
 		outputLine = text
 	} else {
-		outputLine = fmt.Sprintf("%s\t%s\t%s", receiveTimestamp, severity, text)
+		outputLine = fmt.Sprintf("%s\t%s\t%s", timestamp, severity, text)
 	}
 	return outputLine, nil
 }
