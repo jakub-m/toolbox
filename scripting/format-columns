@@ -9,10 +9,14 @@ def main():
     opts = get_options()
     in_sep = opts.input_sep
     out_sep = opts.output_sep
+    col_width_cap = max(opts.max_col_width, 0)
+    elypsis = '...' if opts.elypsis else ''
     rows = []
     for i, line in enumerate(sys.stdin):
         line = line.rstrip("\n")
         parts = line.split(in_sep)
+        if col_width_cap:
+            parts = [cap_width(p, col_width_cap, elypsis) for p in parts]
         if rows:
             prev_width = len(rows[-1])
             this_width = len(parts)
@@ -39,10 +43,17 @@ def pad(s, width):
     return s + ' ' * max(0, width - len(s))
 
 
+def cap_width(s, width, elypsis=''):
+    t = s[:min(len(s), width)]
+    return t if (len(t) == len(s)) else (t + elypsis)
+
+
 def get_options():
     p = argparse.ArgumentParser(description="format input TSV as pretty columns")
-    p.add_argument('-is', '--input-sep', default="\t", help='input separator')
-    p.add_argument('-os', '--output-sep', default=" | ", help='output separator')
+    p.add_argument('-is', '--input-sep', type=str, default="\t", help='input separator')
+    p.add_argument('-os', '--output-sep', type=str, default=" | ", help='output separator')
+    p.add_argument('-cw', '--max-col-width', type=int, default=0, help='cap single column to this width. 0 (default) means that there is no limit')
+    p.add_argument('-el', '--elypsis', action='store_true', default=False, help='add elypsis when capped')
     return p.parse_args()
 
 
