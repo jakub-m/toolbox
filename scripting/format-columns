@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+
+
+import argparse
+import sys
+
+
+def main():
+    opts = get_options()
+    in_sep = opts.input_sep
+    out_sep = opts.output_sep
+    rows = []
+    for i, line in enumerate(sys.stdin):
+        line = line.rstrip("\n")
+        parts = line.split(in_sep)
+        if rows:
+            prev_width = len(rows[-1])
+            this_width = len(parts)
+            if prev_width != this_width:
+                fatal(f"Line {i+1}: previous row had {prev_width} and this row has {this_width}. Expected rows of equal width. Current row:\n{line}")
+        rows.append(parts)
+    col_max_widths = get_max_widths_from_rows(rows)
+    for row in rows:
+        out_line = out_sep.join(pad(col, w) for w, col in zip(col_max_widths, row))
+        print(out_line)
+
+
+def get_max_widths_from_rows(rows):
+    widths_d = {}
+    for row in rows:
+        for i, col in enumerate(row):
+            w = len(col)
+            curr_w = widths_d.setdefault(i, 0)
+            widths_d[i] = max(w, curr_w)
+    return [widths_d[i] for i in range(len(widths_d))]
+
+
+def pad(s, width):
+    return s + ' ' * max(0, width - len(s))
+
+
+def get_options():
+    p = argparse.ArgumentParser(description="format input TSV as pretty columns")
+    p.add_argument('-is', '--input-sep', default="\t", help='input separator')
+    p.add_argument('-os', '--output-sep', default=" | ", help='output separator')
+    return p.parse_args()
+
+
+def fatal(message):
+    if message:
+        print(message)
+    sys.exit(1)
+
+
+main()
