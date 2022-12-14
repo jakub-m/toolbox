@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+
+import argparse
+import csv
+import sys
+
+
+def main():
+    opts = get_opts()
+    r = csv.reader(sys.stdin, delimiter=opts.delimiter, dialect=csv.excel)
+    fields_ind = parse_fields_ind(opts.fields)
+    fields_ind = [i-1 for i in fields_ind if i > 0]
+    for line in r:
+        print(f"{line}", file=sys.stderr)
+        fields = [list_get(line, i, "") for i in fields_ind] # do not fail on missing data
+        out = "\t".join(fields)
+        print(out)
+
+def get_opts():
+    p = argparse.ArgumentParser(description="Take CSV at input and use only specific fields.")
+    p.add_argument("-f", "--fields", required=True, help="fields, starts with 1")
+    p.add_argument("-d", "--delimiter", default="\t", help="delimiter (defaults to tab)")
+    return p.parse_args()
+
+def parse_fields_ind(fields_str):
+    return [int(f) for f in fields_str.split(",")]
+
+def list_get(alist, ind, default):
+    try:
+        return alist[ind]
+    except IndexError:
+        return default
+
+main()
