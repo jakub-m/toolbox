@@ -1,4 +1,6 @@
-# toolbox
+# 🧰 toolbox
+
+Toolbox with small CLI utilities.
 
 - cloudlogs-json-format - format JSON dumps from Google Cloud Logs into pretty lines
 - tscalc - basic calculations on times
