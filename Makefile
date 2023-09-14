@@ -11,7 +11,7 @@ bin/uniqcut: $(shell find cli/uniqcut -type f)
 bin/cloudlogs-json-format: $(shell find cli/cloudlogs-json-format -type f)
 	go build -o bin/cloudlogs-json-format cli/cloudlogs-json-format/main.go
 bin/wall-of-text: $(shell find cli/wall-of-text -type f)
-	go build -o bin/wall-of-text cli/wall-of-text/main.go
+	go build -o bin/wall-of-text cli/wall-of-text/*
 test:
 	go test ./...
 clean:
