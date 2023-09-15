@@ -2,40 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 )
 
-// var regexLineWithListedFields *regexp.Regexp
-
-// func init() {
-// regexLineWithListedFields = regexp.MustCompile(`(\w+:\s+\w+)+`)
-// }
-
-// const newLine = "\n"
-
 func FormatLine(line string) string {
-	// var output strings.Builder
-	// latestConsumedIndex := 0
-	// indentLevel := 0
-	// if allSubmatchIndices := regexLineWithListedFields.FindAllStringSubmatchIndex(line, -1); allSubmatchIndices != nil {
-	// 	for _, submatchIndices := range allSubmatchIndices {
-	// 		for i := 2; i < len(submatchIndices); i += 2 {
-	// 			indexStart := submatchIndices[i]
-	// 			indexEnd := submatchIndices[i+1]
-	// 			if indexStart > latestConsumedIndex {
-	// 				output.WriteString(line[latestConsumedIndex:indexStart])
-	// 			}
-	// 			latestConsumedIndex = indexEnd
-	// 			output.WriteString(newLine)
-	// 			output.WriteString(strings.Repeat("  ", indentLevel))
-	// 			output.WriteString(line[indexStart:indexEnd])
-	// 		}
-
-	// 	}
-	// }
-	// return output.String()
-
 	parsers := []Parser{
 		ParseWordWithTrailingSpace,
 		GetSeriesParser(ParseKeyColonValue),
@@ -45,38 +17,39 @@ func FormatLine(line string) string {
 
 	input := line
 	nodes := []Node{}
-	finish := false
-	for !finish {
+	for {
+		nodeCountAtStart := len(nodes)
 		for _, parse := range parsers {
+			log.Println("Parsing input:", input)
 			node, reminder, err := parse(input)
 			if err != nil {
 				panic(err)
 			}
 			if node != nil {
+				log.Printf("Got node %T: %v", node, node)
 				nodes = append(nodes, node)
-			}
-			if input == reminder {
-				nodes = append(nodes, StringNode(reminder))
-				finish = true
-				break
 			}
 			input = reminder
 		}
+		if len(nodes) == nodeCountAtStart {
+			nodes = append(nodes, StringNode(input))
+			break
+		}
 	}
 	for _, node := range nodes {
-		output.WriteString(node.String())
+		output.WriteString(node.StringIndent(0))
 	}
 
 	return output.String()
 }
 
 type Node interface {
-	String() string
+	StringIndent(level int) string
 }
 
 type StringNode string
 
-func (n StringNode) String() string {
+func (n StringNode) StringIndent(level int) string {
 	return string(n)
 }
 
@@ -88,11 +61,14 @@ type Series struct {
 	nodes []Node
 }
 
-func (s Series) String() string {
+func (s Series) StringIndent(level int) string {
 	var b strings.Builder
+	b.WriteString("\n")
 	for _, n := range s.nodes {
-		b.WriteString(n.String())
-
+		b.WriteString(strings.Repeat(" ", level+1))
+		nodeString := n.StringIndent(level + 1)
+		b.WriteString(nodeString)
+		b.WriteString("\n")
 	}
 	return b.String()
 }
@@ -106,7 +82,11 @@ func GetSeriesParser(parser Parser) Parser {
 				return nil, input, err
 			}
 			if remainder == input {
-				return series, remainder, nil
+				if len(series.nodes) == 0 {
+					return nil, remainder, nil
+				} else {
+					return series, remainder, nil
+				}
 			}
 			if node == nil {
 				return nil, input, fmt.Errorf("parser %v returned no node but yet consumed input, this should not happen", parser)
@@ -120,35 +100,49 @@ func GetSeriesParser(parser Parser) Parser {
 
 type KeyColonValue string
 
-func (k KeyColonValue) String() string {
+func (k KeyColonValue) StringIndent(level int) string {
 	return string(k)
 }
 
 func ParseKeyColonValue(input string) (Node, string, error) {
 	re := regexp.MustCompile(`^(\w+:\s+\w+)(?:,\s+)?`)
 	match := re.FindStringSubmatchIndex(input)
-	if match == nil {
+	if len(match) == 0 {
 		return nil, input, nil
 	}
 	if len(match) != 4 {
 		return nil, input, fmt.Errorf("the returned match for string %v is wrong: %v", input, match)
 	}
-	start, end := match[2], match[3]
-	return KeyColonValue(input[start:end]), input[end:], nil
+	_, matchEnd, groupStart, groupEnd := match[0], match[1], match[2], match[3]
+	if r, ok := getFirstRune(input[groupEnd:]); ok && r == ':' {
+		// Do not consume strings like "foo: bar:". Golang regex does not support negative look-aheads.
+		return nil, input, nil
+	}
+	return KeyColonValue(input[groupStart:groupEnd]), input[matchEnd:], nil
 }
 
 type WordWithTrailingSpace string
 
-func (w WordWithTrailingSpace) String() string {
+func (w WordWithTrailingSpace) StringIndent(level int) string {
 	return string(w)
 }
 
 func ParseWordWithTrailingSpace(input string) (Node, string, error) {
 	re := regexp.MustCompile(`^(\S+\s)`)
 	match := re.FindStringSubmatchIndex(input)
+	if len(match) == 0 {
+		return nil, input, nil
+	}
 	if len(match) != 4 {
 		return nil, input, fmt.Errorf("the returned match for string %v is wrong: %v", input, match)
 	}
 	start, end := match[2], match[3]
 	return WordWithTrailingSpace(input[start:end]), input[end:], nil
+}
+
+func getFirstRune(s string) (rune, bool) {
+	for _, r := range s {
+		return r, true
+	}
+	return '\u0000', false
 }
