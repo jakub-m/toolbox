@@ -17,7 +17,7 @@ bin/wall-of-text: $(shell find cli/wall-of-text -type f)
 	go build -o bin/wall-of-text cli/wall-of-text/*
 bin/diff-of-two: $(shell find cli/diff-of-two -type f)
 	go build -o bin/diff-of-two cli/diff-of-two/*
-bin/yamljson: $(shell find cli/yaml-json -type f)
+bin/yamljson: $(shell find cli/yamljson -type f)
 	go build -o bin/yamljson cli/yamljson/*
 test:
 	go test ./...
