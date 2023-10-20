@@ -3,7 +3,9 @@ default: \
     bin/uniqcut \
     bin/cloudlogs-json-format \
     bin/wall-of-text \
-    bin/diff-of-two
+    bin/diff-of-two \
+	bin/yamljson
+
 
 bin/tscalc: $(shell find cli/tscalc -type f)
 	go build -o bin/tscalc cli/tscalc/main.go
@@ -15,6 +17,8 @@ bin/wall-of-text: $(shell find cli/wall-of-text -type f)
 	go build -o bin/wall-of-text cli/wall-of-text/*
 bin/diff-of-two: $(shell find cli/diff-of-two -type f)
 	go build -o bin/diff-of-two cli/diff-of-two/*
+bin/yamljson: $(shell find cli/yaml-json -type f)
+	go build -o bin/yamljson cli/yamljson/*
 test:
 	go test ./...
 clean:
