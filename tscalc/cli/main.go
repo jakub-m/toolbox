@@ -123,25 +123,13 @@ func reduceTree(root parse.Node) (parse.Node, error) {
 }
 
 func addNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
-	left, ok := leftNode.(parse.IsoTimeNode)
-	if !ok {
-		return nil, fmt.Errorf("BUG! Expected the left addition node to be epoch time node, was %T: %v", leftNode, leftNode)
-	}
-	right, ok := rightNode.(parse.PeriodNode)
-	if !ok {
-		return nil, fmt.Errorf("BUG! Expected the right addition node to be period node, was %T: %v", rightNode, rightNode)
-	}
+	left := leftNode.(parse.IsoTimeNode)
+	right := rightNode.(parse.PeriodNode)
 	return parse.IsoTimeNode(time.Time(left).Add(time.Duration(right))), nil
 }
 
 func subNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
-	left, ok := leftNode.(parse.IsoTimeNode)
-	if !ok {
-		return nil, fmt.Errorf("BUG! Expected the left subtraction node to be iso time node, was %T: %v", leftNode, leftNode)
-	}
-	right, ok := rightNode.(parse.IsoTimeNode)
-	if !ok {
-		return nil, fmt.Errorf("BUG! Expected the right subtraction node to be iso time node, was %T: %v", rightNode, rightNode)
-	}
+	left := leftNode.(parse.IsoTimeNode)
+	right := rightNode.(parse.IsoTimeNode)
 	return parse.PeriodNode(time.Time(left).Sub(time.Time(right))), nil
 }
