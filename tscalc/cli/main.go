@@ -16,6 +16,17 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+
+	if fi, err := os.Stdin.Stat(); err == nil {
+		// If stdin not opened, just print current time.
+		if fi.Size() == 0 {
+			fmt.Printf("%s\n", parse.IsoTimeNode(time.Now()))
+			return
+		}
+	} else {
+		log.Fatal(err)
+	}
+
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		text := scanner.Text()
