@@ -47,15 +47,14 @@ func handleLine(line string) (string, error) {
 }
 
 func parseInput(input string) (parse.Node, error) {
-	p := parse.GetParser()
-	epochTimeNode, rest, err := p(input)
+	root, rest, err := parse.GetParser()(input)
 	if err != nil {
 		return nil, err
 	}
 	if rest != "" {
 		return nil, fmt.Errorf("failed to parse whole input, the reminder: %s", rest)
 	}
-	return epochTimeNode, nil
+	return root, nil
 }
 
 //func calcuate(expr string) (string, error) {

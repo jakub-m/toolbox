@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+func GetParser() ParseFunc {
+	return FirstOf(
+		ContinuedBy(EpochTime, WhitespaceEOL),
+		ContinuedBy(IsoTime, WhitespaceEOL),
+	)
+}
+
 type Node any
 
 type EpochTimeNode float64
@@ -29,10 +36,6 @@ func (n IsoTimeNode) FormatTimestamp() string {
 // ParseFunc returns the node if found, the remaining string and the error if any. If the node is not found, then
 // do not return error, just return nil node. An error means that the program should stop immediatelly.
 type ParseFunc func(input string) (Node, string, error)
-
-func GetParser() ParseFunc {
-	return FirstOf(ContinuedBy(EpochTime, WhitespaceEOL), ContinuedBy(IsoTime, WhitespaceEOL))
-}
 
 type WhitespaceNode struct{}
 
