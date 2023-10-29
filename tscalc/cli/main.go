@@ -35,15 +35,27 @@ func handleLine(line string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// if root is the only node, which it is for now...
+
+	// If the input is a plain value, then only convert the formats.
 	switch n := root.(type) {
 	case parse.EpochTimeNode:
 		return n.FormatISO(), nil
 	case *parse.IsoTimeNode:
 		return n.FormatTimestamp(), nil
-	default:
-		return "", fmt.Errorf("unknown type of node %T", root)
 	}
+
+	// When at the input there are more values, then perform the proper calculations.
+	reduced, err := reduceTree(root)
+	if err != nil {
+		return "", err
+	}
+
+	node, ok := reduced.(parse.EpochTimeNode)
+	if !ok {
+		return "", fmt.Errorf("BUG! After reduction expected other node type, got %T: %v", reduced, reduced)
+	}
+
+	return node.FormatISO(), nil
 }
 
 func parseInput(input string) (parse.Node, error) {
@@ -55,6 +67,40 @@ func parseInput(input string) (parse.Node, error) {
 		return nil, fmt.Errorf("failed to parse whole input, the reminder: %s", rest)
 	}
 	return root, nil
+}
+
+// reduceTree performs actual operations on nodes.
+func reduceTree(root parse.Node) (parse.Node, error) {
+	switch node := root.(type) {
+	case parse.EpochTimeNode, parse.PeriodNode:
+		return node, nil
+	case *parse.IsoTimeNode:
+		return node.ToEpochTimeNode(), nil
+	case *parse.AddNode:
+		reducedLeft, err := reduceTree(node.Left)
+		if err != nil {
+			return nil, err
+		}
+		reducedRight, err := reduceTree(node.Right)
+		if err != nil {
+			return nil, err
+		}
+		return addNodes(reducedLeft, reducedRight)
+	default:
+		return nil, fmt.Errorf("BUG! Unexpected node type in reduceTree %T: %v", root, root)
+	}
+}
+
+func addNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
+	left, ok := leftNode.(parse.EpochTimeNode)
+	if !ok {
+		return nil, fmt.Errorf("BUG! Expected the left addition node to be epoch time node, was %T: %v", leftNode, leftNode)
+	}
+	right, ok := rightNode.(parse.PeriodNode)
+	if !ok {
+		return nil, fmt.Errorf("BUG! Expected the right addition node to be period node, was %T: %v", rightNode, rightNode)
+	}
+	return parse.EpochTimeNode(float64(left) + right.Seconds), nil
 }
 
 //func calcuate(expr string) (string, error) {

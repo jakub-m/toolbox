@@ -9,10 +9,7 @@ import (
 )
 
 func GetParser() ParseFunc {
-	time_ := FirstOf(
-		ContinuedBy(EpochTime, WhitespaceEOL),
-		ContinuedBy(IsoTime, WhitespaceEOL),
-	)
+	time_ := FirstOf(IsoTime, EpochTime)
 	return FirstOf(Addition(time_, Period), time_)
 }
 
@@ -23,7 +20,7 @@ type Node any
 type ParseFunc func(input string) (Node, string, error)
 
 type AddNode struct {
-	left, right Node
+	Left, Right Node
 }
 
 // Addition returns <something> + <something else>. Addition parser takes care of whitespace.
@@ -41,12 +38,12 @@ func Addition(leftParser, rightParser ParseFunc) ParseFunc {
 		if !(ok && len(seq) == 3) {
 			return nil, input, fmt.Errorf("BUG! Expected 3 element sequence in Addition, got: %v", seq)
 		}
-		return AddNode{seq[0], seq[2]}, rest, nil
+		return &AddNode{seq[0], seq[2]}, rest, nil
 	}
 }
 
 type PeriodNode struct {
-	seconds float64
+	Seconds float64
 }
 
 func Period(input string) (Node, string, error) {
@@ -73,7 +70,6 @@ func Sequence(parsers ...ParseFunc) ParseFunc {
 		actualInput := input
 		for _, parser := range parsers {
 			node, rest, err := parser(actualInput)
-			fmt.Println("parser", parser, "input", actualInput)
 			if err != nil || node == nil {
 				return node, input, err
 			}
@@ -171,6 +167,10 @@ func (t EpochTimeNode) FormatISO() string {
 	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
 }
 
+// func (t EpochTimeNode) ToISOTimeNode() IsoTimeNode {
+// 	return IsoTimeNode(time.UnixMicro(int64(1_000_000 * float64(t))))
+// }
+
 func EpochTime(input string) (Node, string, error) {
 	pat := regexp.MustCompile(`^\d+(\.\d+)?`)
 	indices := pat.FindStringIndex(input)
@@ -190,6 +190,11 @@ type IsoTimeNode time.Time
 func (n IsoTimeNode) FormatTimestamp() string {
 	t := time.Time(n)
 	return fmt.Sprintf("%d", t.Unix())
+}
+
+func (n IsoTimeNode) ToEpochTimeNode() EpochTimeNode {
+	t := time.Time(n).Unix()
+	return EpochTimeNode(t)
 }
 
 func IsoTime(input string) (Node, string, error) {
