@@ -7,6 +7,7 @@ import (
 	"lib/tscalc/parse"
 	"log"
 	"os"
+	"time"
 )
 
 func main() {
@@ -39,9 +40,9 @@ func handleLine(line string) (string, error) {
 	// If the input is a plain value, then only convert the formats.
 	switch n := root.(type) {
 	case parse.EpochTimeNode:
-		return n.FormatISO(), nil
+		return fmt.Sprint(n.ToIsoTimeNode()), nil
 	case parse.IsoTimeNode:
-		return n.FormatTimestamp(), nil
+		return fmt.Sprint(n.ToEpochTimeNode()), nil
 	}
 
 	// When at the input there are more values, then perform the proper calculations.
@@ -52,10 +53,8 @@ func handleLine(line string) (string, error) {
 
 	// Format output
 	switch n := reduced.(type) {
-	case parse.EpochTimeNode:
-		return n.FormatISO(), nil
-	case parse.PeriodNode:
-		return n.String(), nil
+	case parse.IsoTimeNode, parse.PeriodNode:
+		return fmt.Sprint(n), nil
 	}
 
 	return "", fmt.Errorf("BUG! After reduction expected other node type, got %T: %v", reduced, reduced)
@@ -75,10 +74,10 @@ func parseInput(input string) (parse.Node, error) {
 // reduceTree performs actual operations on nodes.
 func reduceTree(root parse.Node) (parse.Node, error) {
 	switch node := root.(type) {
-	case parse.EpochTimeNode, parse.PeriodNode:
+	case parse.EpochTimeNode:
+		return node.ToIsoTimeNode(), nil
+	case parse.IsoTimeNode, parse.PeriodNode:
 		return node, nil
-	case parse.IsoTimeNode:
-		return node.ToEpochTimeNode(), nil
 	case parse.AddNode:
 		reducedLeft, err := reduceTree(node.Left)
 		if err != nil {
@@ -105,7 +104,7 @@ func reduceTree(root parse.Node) (parse.Node, error) {
 }
 
 func addNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
-	left, ok := leftNode.(parse.EpochTimeNode)
+	left, ok := leftNode.(parse.IsoTimeNode)
 	if !ok {
 		return nil, fmt.Errorf("BUG! Expected the left addition node to be epoch time node, was %T: %v", leftNode, leftNode)
 	}
@@ -113,63 +112,17 @@ func addNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
 	if !ok {
 		return nil, fmt.Errorf("BUG! Expected the right addition node to be period node, was %T: %v", rightNode, rightNode)
 	}
-	return parse.EpochTimeNode(float64(left) + right.Seconds), nil
+	return parse.IsoTimeNode(time.Time(left).Add(time.Duration(right))), nil
 }
 
 func subNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
-	left, ok := leftNode.(parse.EpochTimeNode)
+	left, ok := leftNode.(parse.IsoTimeNode)
 	if !ok {
-		return nil, fmt.Errorf("BUG! Expected the left subtraction node to be epoch time node, was %T: %v", leftNode, leftNode)
+		return nil, fmt.Errorf("BUG! Expected the left subtraction node to be iso time node, was %T: %v", leftNode, leftNode)
 	}
-	right, ok := rightNode.(parse.EpochTimeNode)
+	right, ok := rightNode.(parse.IsoTimeNode)
 	if !ok {
-		return nil, fmt.Errorf("BUG! Expected the right subtraction node to be period node, was %T: %v", rightNode, rightNode)
+		return nil, fmt.Errorf("BUG! Expected the right subtraction node to be iso time node, was %T: %v", rightNode, rightNode)
 	}
-	return parse.PeriodNode{Seconds: float64(left) - float64(right)}, nil
+	return parse.PeriodNode(time.Time(left).Sub(time.Time(right))), nil
 }
-
-//func calcuate(expr string) (string, error) {
-//	reMain := regexp.MustCompile(`([\d:]+)\s+-\s+([\d:]+)`)
-//	matchMain := reMain.FindStringSubmatch(expr)
-//	if !(len(matchMain) == 3 && matchMain[0] == expr) {
-//		return "", fmt.Errorf("not a correct input expression: `%s`", expr)
-//	}
-//	timeLeft, err := parseTime(matchMain[1])
-//	if err != nil {
-//		return "", err
-//	}
-//	timeRight, err := parseTime(matchMain[2])
-//	if err != nil {
-//		return "", err
-//	}
-//	d := timeLeft.minutes - timeRight.minutes
-//	return fmt.Sprintf("%d", d), nil
-//}
-//
-//func parseTime(timeStr string) (time, error) {
-//	errMessage := fmt.Errorf("not a correct time: `%s`", timeStr)
-//	re := regexp.MustCompile(`(\d+):(\d+)`)
-//	m := re.FindStringSubmatch(timeStr)
-//	if !(len(m) == 3 && m[0] == timeStr) {
-//		return time{}, errMessage
-//	}
-//	hh, err := strconv.Atoi(m[1])
-//	if err != nil {
-//		return time{}, errMessage
-//	}
-//	mm, err := strconv.Atoi(m[2])
-//	if err != nil {
-//		return time{}, errMessage
-//	}
-//	return time{
-//		minutes: hh*60 + mm,
-//	}, nil
-//}
-//
-//type time struct {
-//	minutes int
-//}
-//
-//func subMinutes(left, right time) int {
-//	return left.minutes - right.minutes
-//}

@@ -2,7 +2,6 @@ package parse
 
 import (
 	"fmt"
-	"math"
 	"regexp"
 	"strconv"
 	"time"
@@ -65,27 +64,24 @@ func Subtraction(leftParser, rightParser ParseFunc) ParseFunc {
 	}
 }
 
-type PeriodNode struct {
-	Seconds float64
-}
+type PeriodNode time.Duration
 
 func (n PeriodNode) String() string {
-	return fmt.Sprintf("%dsec", int64(n.Seconds))
+	return fmt.Sprint(time.Duration(n))
 }
 
 func Period(input string) (Node, string, error) {
-	pat := regexp.MustCompile(`^(\d+)sec`)
+	pat := regexp.MustCompile(`^(?:\d+\w+)+`)
 	indices := pat.FindStringSubmatchIndex(input)
 	if indices == nil {
 		return nil, input, nil
 	}
-	matchSec, rest := input[indices[2]:indices[3]], input[indices[1]:]
-	seconds, err := strconv.ParseFloat(matchSec, 64)
+	match, rest := input[indices[0]:indices[1]], input[indices[1]:]
+	d, err := time.ParseDuration(match)
 	if err != nil {
-		return 0, input, fmt.Errorf("error while parsing %s: %w", input, err)
+		return 0, input, fmt.Errorf("error while parsing duration %s: %w", d, err)
 	}
-	node := PeriodNode{seconds}
-	return node, rest, nil
+	return PeriodNode(d), rest, nil
 }
 
 type SequenceNode []Node
@@ -188,14 +184,18 @@ type EpochTimeNode float64
 
 const isoFormat = "2006-01-02T15:04:05-07:00"
 
-func (t EpochTimeNode) FormatISO() string {
-	sec, frac := math.Modf(float64(t))
-	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
+// func (t EpochTimeNode) FormatISO() string {
+// 	sec, frac := math.Modf(float64(t))
+// 	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
+// }
+
+func (t EpochTimeNode) ToIsoTimeNode() IsoTimeNode {
+	return IsoTimeNode(time.UnixMicro(int64(1_000_000 * float64(t))))
 }
 
-// func (t EpochTimeNode) ToISOTimeNode() IsoTimeNode {
-// 	return IsoTimeNode(time.UnixMicro(int64(1_000_000 * float64(t))))
-// }
+func (n EpochTimeNode) String() string {
+	return fmt.Sprintf("%f", n)
+}
 
 func EpochTime(input string) (Node, string, error) {
 	pat := regexp.MustCompile(`^\d+(\.\d+)?`)
@@ -213,9 +213,8 @@ func EpochTime(input string) (Node, string, error) {
 
 type IsoTimeNode time.Time
 
-func (n IsoTimeNode) FormatTimestamp() string {
-	t := time.Time(n)
-	return fmt.Sprintf("%d", t.Unix())
+func (n IsoTimeNode) String() string {
+	return time.Time(n).UTC().Format(isoFormat)
 }
 
 func (n IsoTimeNode) ToEpochTimeNode() EpochTimeNode {
