@@ -7,18 +7,18 @@ default: \
 	bin/yamljson
 
 
-bin/tscalc: $(shell find cli/tscalc -type f)
-	go build -o bin/tscalc tscalc/cli/main.go
-bin/uniqcut: $(shell find cli/uniqcut -type f)
-	go build -o bin/uniqcut cli/uniqcut/main.go
-bin/cloudlogs-json-format: $(shell find cli/cloudlogs-json-format -type f)
-	go build -o bin/cloudlogs-json-format cli/cloudlogs-json-format/main.go
-bin/wall-of-text: $(shell find cli/wall-of-text -type f)
-	go build -o bin/wall-of-text cli/wall-of-text/*
-bin/diff-of-two: $(shell find cli/diff-of-two -type f)
-	go build -o bin/diff-of-two cli/diff-of-two/*
-bin/yamljson: $(shell find cli/yamljson -type f)
-	go build -o bin/yamljson cli/yamljson/*
+bin/tscalc: $(shell find tscalc/cli -type f)
+	go build -o bin/tscalc tscalc/cli/*
+bin/uniqcut: $(shell find uniqcut/cli -type f)
+	go build -o bin/uniqcut uniqcut/cli/*
+bin/cloudlogs-json-format: $(shell find cloudlogs-json-format/cli -type f)
+	go build -o bin/cloudlogs-json-format cloudlogs-json-format/cli/*
+bin/wall-of-text: $(shell find wall-of-text/cli -type f)
+	go build -o bin/wall-of-text wall-of-text/cli/*
+bin/diff-of-two: $(shell find diff-of-two/cli -type f)
+	go build -o bin/diff-of-two diff-of-two/cli/*
+bin/yamljson: $(shell find yamljson/cli -type f)
+	go build -o bin/yamljson yamljson/cli/*
 test:
 	go test ./...
 clean:
