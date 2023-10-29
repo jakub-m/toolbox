@@ -13,7 +13,7 @@ import (
 
 func main() {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, `Usage: paste the timestamp or operations on timestamp at the input. If there is no operation, the timestamp will be converted between epoch seconds and UTC time.`)
+		fmt.Fprintf(os.Stderr, `Usage: Paste the timestamp or operations on timestamp at the input. If there is no operation, the timestamp will be converted between epoch seconds and UTC time.\n\n`)
 		flag.PrintDefaults()
 	}
 	var verbose bool
