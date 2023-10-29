@@ -9,43 +9,118 @@ import (
 )
 
 func GetParser() ParseFunc {
-	return FirstOf(
+	time_ := FirstOf(
 		ContinuedBy(EpochTime, WhitespaceEOL),
 		ContinuedBy(IsoTime, WhitespaceEOL),
 	)
+	return FirstOf(time_, Addition(time_, Period))
 }
 
 type Node any
-
-type EpochTimeNode float64
-
-const isoFormat = "2006-01-02T15:04:05-07:00"
-
-func (t EpochTimeNode) FormatISO() string {
-	sec, frac := math.Modf(float64(t))
-	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
-}
-
-type IsoTimeNode time.Time
-
-func (n IsoTimeNode) FormatTimestamp() string {
-	t := time.Time(n)
-	return fmt.Sprintf("%d", t.Unix())
-}
 
 // ParseFunc returns the node if found, the remaining string and the error if any. If the node is not found, then
 // do not return error, just return nil node. An error means that the program should stop immediatelly.
 type ParseFunc func(input string) (Node, string, error)
 
+type AddNode struct {
+	left, right Node
+}
+
+func Addition(leftParser, rightParser ParseFunc) ParseFunc {
+	return func(input string) (Node, string, error) {
+		node, rest, err := Sequence(leftParser, RegexLiteral(`\+`), rightParser)(input)
+		if err != nil || node == nil {
+			return node, rest, err
+		}
+		seq, ok := node.(SequenceNode)
+		if !(ok && len(seq) == 3) {
+			return nil, input, fmt.Errorf("BUG! Expected 3 element sequence in Addition, got: %v", seq)
+		}
+		return AddNode{seq[0], seq[2]}, rest, nil
+	}
+}
+
+type PeriodNode struct {
+	seconds float64
+}
+
+func Period(input string) (Node, string, error) {
+	pat := regexp.MustCompile(`^(\d+)sec`)
+	indices := pat.FindStringSubmatchIndex(input)
+	if indices == nil {
+		return nil, input, nil
+	}
+	matchSec, rest := input[indices[2]:indices[3]], input[indices[1]:]
+	seconds, err := strconv.ParseFloat(matchSec, 64)
+	if err != nil {
+		return 0, input, fmt.Errorf("error while parsing %s: %w", input, err)
+	}
+	node := PeriodNode{seconds}
+	return node, rest, nil
+}
+
+type SequenceNode []Node
+
+// Sequence returns a sequence if all the parsers successfully parse.
+func Sequence(parsers ...ParseFunc) ParseFunc {
+	seq := SequenceNode{}
+	return func(input string) (Node, string, error) {
+		for _, parser := range parsers {
+			node, rest, err := parser(input)
+			if err != nil || node == nil {
+				return node, rest, err
+			}
+			input = rest
+			seq = append(seq, node)
+		}
+		return seq, input, nil
+	}
+}
+
+//
+//type EmptyNode struct{}
+//
+//// Optional retuns a dummy empty node if the parser does not parse
+//func Optional(parser ParseFunc) ParseFunc {
+//	return func(input string) (Node, string, error) {
+//		node, rest, err := parser(input)
+//		if err != nil {
+//			return node, rest, err
+//		}
+//		if node == nil {
+//			if rest == input {
+//				return EmptyNode{}, rest, nil
+//			} else {
+//				return nil, rest, fmt.Errorf("BUG! The parser in the optional node did not parse anything but consumed input")
+//			}
+//		}
+//		return node, rest, nil
+//	}
+//}
+
+type RegexLiteralNode struct{ match string }
+
+func RegexLiteral(pat string) ParseFunc {
+	return func(input string) (Node, string, error) {
+		pat := regexp.MustCompile(pat)
+		indices := pat.FindStringIndex(input)
+		if indices == nil {
+			return nil, input, nil
+		}
+		match, rest := input[indices[0]:indices[1]], input[indices[1]:]
+		return RegexLiteralNode{match: match}, rest, nil
+	}
+}
+
 type WhitespaceNode struct{}
 
 func WhitespaceEOL(input string) (Node, string, error) {
-	pat := regexp.MustCompile(`(\s+)|$^`)
+	pat := regexp.MustCompile(`^(\s+)|^$`)
 	indices := pat.FindStringIndex(input)
 	if indices == nil {
 		return nil, input, nil
 	}
-	_, rest := input[indices[0]:indices[1]], input[indices[1]:]
+	rest := input[indices[1]:]
 	node := WhitespaceNode{}
 	return &node, rest, nil
 }
@@ -80,8 +155,17 @@ func FirstOf(parsers ...ParseFunc) ParseFunc {
 	}
 }
 
+type EpochTimeNode float64
+
+const isoFormat = "2006-01-02T15:04:05-07:00"
+
+func (t EpochTimeNode) FormatISO() string {
+	sec, frac := math.Modf(float64(t))
+	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
+}
+
 func EpochTime(input string) (Node, string, error) {
-	pat := regexp.MustCompile(`\d+(\.\d+)?`)
+	pat := regexp.MustCompile(`^\d+(\.\d+)?`)
 	indices := pat.FindStringIndex(input)
 	if indices == nil {
 		return 0, input, nil
@@ -94,8 +178,15 @@ func EpochTime(input string) (Node, string, error) {
 	return EpochTimeNode(t), input[indices[1]:], nil
 }
 
+type IsoTimeNode time.Time
+
+func (n IsoTimeNode) FormatTimestamp() string {
+	t := time.Time(n)
+	return fmt.Sprintf("%d", t.Unix())
+}
+
 func IsoTime(input string) (Node, string, error) {
-	pat := regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}`)
+	pat := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}`)
 	indices := pat.FindStringIndex(input)
 	if indices == nil {
 		return nil, input, nil
