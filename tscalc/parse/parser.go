@@ -38,7 +38,7 @@ func Addition(leftParser, rightParser ParseFunc) ParseFunc {
 		if !(ok && len(seq) == 3) {
 			return nil, input, fmt.Errorf("BUG! Expected 3 element sequence in Addition, got: %v", seq)
 		}
-		return &AddNode{seq[0], seq[2]}, rest, nil
+		return AddNode{seq[0], seq[2]}, rest, nil
 	}
 }
 
@@ -124,8 +124,7 @@ func WhitespaceEOL(input string) (Node, string, error) {
 		return nil, input, nil
 	}
 	rest := input[indices[1]:]
-	node := WhitespaceNode{}
-	return &node, rest, nil
+	return WhitespaceNode{}, rest, nil
 }
 
 // ContinuedBy returns result of the main parser only if the reminder of main is parsed by the continuation parser.
@@ -208,6 +207,5 @@ func IsoTime(input string) (Node, string, error) {
 	if err != nil {
 		return nil, input, fmt.Errorf("error while parsing %s: %w", input, err)
 	}
-	node := IsoTimeNode(t)
-	return &node, input[indices[1]:], nil
+	return IsoTimeNode(t), input[indices[1]:], nil
 }

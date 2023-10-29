@@ -40,7 +40,7 @@ func handleLine(line string) (string, error) {
 	switch n := root.(type) {
 	case parse.EpochTimeNode:
 		return n.FormatISO(), nil
-	case *parse.IsoTimeNode:
+	case parse.IsoTimeNode:
 		return n.FormatTimestamp(), nil
 	}
 
@@ -74,9 +74,9 @@ func reduceTree(root parse.Node) (parse.Node, error) {
 	switch node := root.(type) {
 	case parse.EpochTimeNode, parse.PeriodNode:
 		return node, nil
-	case *parse.IsoTimeNode:
+	case parse.IsoTimeNode:
 		return node.ToEpochTimeNode(), nil
-	case *parse.AddNode:
+	case parse.AddNode:
 		reducedLeft, err := reduceTree(node.Left)
 		if err != nil {
 			return nil, err
