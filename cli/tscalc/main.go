@@ -41,24 +41,35 @@ func handleLine(line string) (string, error) {
 	// if root is the only node, which it is for now...
 	switch n := root.(type) {
 	case EpochTimeNode:
-		return n.isoFormat(), nil
+		return n.formatISO(), nil
+	case *IsoTimeNode:
+		return n.formatTimestamp(), nil
 	default:
 		return "", fmt.Errorf("unknown type of node %T", root)
 	}
 }
 
-type Node interface {
-}
+type Node any
 
 type EpochTimeNode float64
 
-func (t EpochTimeNode) isoFormat() string {
+const isoFormat = "2006-01-02T15:04:05-07:00"
+
+func (t EpochTimeNode) formatISO() string {
 	sec, frac := math.Modf(float64(t))
-	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format("2006-01-02T15:04:05-07:00")
+	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
+}
+
+type IsoTimeNode time.Time
+
+func (n IsoTimeNode) formatTimestamp() string {
+	t := time.Time(n)
+	return fmt.Sprintf("%d", t.Unix())
 }
 
 func parse(input string) (Node, error) {
-	epochTimeNode, rest, err := parseEpochTime(input)
+	parser := getParser()
+	epochTimeNode, rest, err := parser(input)
 	if err != nil {
 		return nil, err
 	}
@@ -68,9 +79,30 @@ func parse(input string) (Node, error) {
 	return epochTimeNode, nil
 }
 
-// parseEpochTime returns the node if found, the output string and the error if any. If the node is not found, then
-// do not return error. Erorrs mean that the program should stop.
-func parseEpochTime(input string) (EpochTimeNode, string, error) {
+func getParser() parseFunc {
+	return firstOf(parseEpochTime, parseIsoTime)
+}
+
+// parseFunc returns the node if found, the remaining string and the error if any. If the node is not found, then
+// do not return error, just return nil node. An error means that the program should stop immediatelly.
+type parseFunc func(input string) (Node, string, error)
+
+func firstOf(parsers ...parseFunc) parseFunc {
+	return func(input string) (Node, string, error) {
+		for _, p := range parsers {
+			node, rest, err := p(input)
+			if err != nil {
+				return nil, input, err
+			}
+			if node != nil {
+				return node, rest, err
+			}
+		}
+		return nil, input, nil
+	}
+}
+
+func parseEpochTime(input string) (Node, string, error) {
 	reEpochTime := regexp.MustCompile(`\d+(\.\d+)?`)
 	indices := reEpochTime.FindStringIndex(input)
 	if indices == nil {
@@ -79,9 +111,24 @@ func parseEpochTime(input string) (EpochTimeNode, string, error) {
 	match := input[indices[0]:indices[1]]
 	t, err := strconv.ParseFloat(match, 64)
 	if err != nil {
-		return 0, input, fmt.Errorf("error while parsing %s: %w", err)
+		return 0, input, fmt.Errorf("error while parsing %s: %w", input, err)
 	}
 	return EpochTimeNode(t), input[indices[1]:], nil
+}
+
+func parseIsoTime(input string) (Node, string, error) {
+	reIsoTime := regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}`)
+	indices := reIsoTime.FindStringIndex(input)
+	if indices == nil {
+		return nil, input, nil
+	}
+	match := input[indices[0]:indices[1]]
+	t, err := time.Parse(isoFormat, match)
+	if err != nil {
+		return nil, input, fmt.Errorf("error while parsing %s: %w", input, err)
+	}
+	node := IsoTimeNode(t)
+	return &node, input[indices[1]:], nil
 }
 
 //func calcuate(expr string) (string, error) {
