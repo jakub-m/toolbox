@@ -13,7 +13,7 @@ func GetParser() ParseFunc {
 		ContinuedBy(EpochTime, WhitespaceEOL),
 		ContinuedBy(IsoTime, WhitespaceEOL),
 	)
-	return FirstOf(time_, Addition(time_, Period))
+	return FirstOf(Addition(time_, Period), time_)
 }
 
 type Node any
@@ -26,9 +26,14 @@ type AddNode struct {
 	left, right Node
 }
 
+// Addition returns <something> + <something else>. Addition parser takes care of whitespace.
 func Addition(leftParser, rightParser ParseFunc) ParseFunc {
 	return func(input string) (Node, string, error) {
-		node, rest, err := Sequence(leftParser, RegexLiteral(`\+`), rightParser)(input)
+		node, rest, err := Sequence(
+			ContinuedBy(leftParser, WhitespaceEOL),
+			ContinuedBy(RegexLiteral(`\+`), WhitespaceEOL),
+			rightParser,
+		)(input)
 		if err != nil || node == nil {
 			return node, rest, err
 		}
@@ -65,15 +70,17 @@ type SequenceNode []Node
 func Sequence(parsers ...ParseFunc) ParseFunc {
 	seq := SequenceNode{}
 	return func(input string) (Node, string, error) {
+		actualInput := input
 		for _, parser := range parsers {
-			node, rest, err := parser(input)
+			node, rest, err := parser(actualInput)
+			fmt.Println("parser", parser, "input", actualInput)
 			if err != nil || node == nil {
-				return node, rest, err
+				return node, input, err
 			}
-			input = rest
+			actualInput = rest
 			seq = append(seq, node)
 		}
-		return seq, input, nil
+		return seq, actualInput, nil
 	}
 }
 
