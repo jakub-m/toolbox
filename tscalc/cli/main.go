@@ -79,22 +79,51 @@ func parse(input string) (Node, error) {
 	return epochTimeNode, nil
 }
 
+type parseFunc func(input string) (Node, string, error)
+
 func getParser() parseFunc {
-	return firstOf(parseEpochTime, parseIsoTime)
+	return firstOf(continuedBy(parseEpochTime, parseWhitespaceEOL), continuedBy(parseIsoTime, parseWhitespaceEOL))
+}
+
+type WhitespaceNode struct{}
+
+func parseWhitespaceEOL(input string) (Node, string, error) {
+	pat := regexp.MustCompile(`(\s+)|$^`)
+	indices := pat.FindStringIndex(input)
+	if indices == nil {
+		return nil, input, nil
+	}
+	_, rest := input[indices[0]:indices[1]], input[indices[1]:]
+	node := WhitespaceNode{}
+	return &node, rest, nil
 }
 
 // parseFunc returns the node if found, the remaining string and the error if any. If the node is not found, then
 // do not return error, just return nil node. An error means that the program should stop immediatelly.
-type parseFunc func(input string) (Node, string, error)
+
+// continuedBy returns result of the main parser only if the reminder of main is parsed by the continuation parser.
+func continuedBy(main, continuation parseFunc) parseFunc {
+	return func(input string) (Node, string, error) {
+		node, rest, err := main(input)
+		if err != nil {
+			return node, rest, err
+		}
+		contNode, contRest, contErr := continuation(rest)
+		if contErr != nil {
+			return contNode, contRest, contErr
+		}
+		if contNode != nil {
+			return node, contRest, nil
+		}
+		return nil, input, nil
+	}
+}
 
 func firstOf(parsers ...parseFunc) parseFunc {
 	return func(input string) (Node, string, error) {
 		for _, p := range parsers {
 			node, rest, err := p(input)
-			if err != nil {
-				return nil, input, err
-			}
-			if node != nil {
+			if err != nil || node != nil {
 				return node, rest, err
 			}
 		}
@@ -103,8 +132,8 @@ func firstOf(parsers ...parseFunc) parseFunc {
 }
 
 func parseEpochTime(input string) (Node, string, error) {
-	reEpochTime := regexp.MustCompile(`\d+(\.\d+)?`)
-	indices := reEpochTime.FindStringIndex(input)
+	pat := regexp.MustCompile(`\d+(\.\d+)?`)
+	indices := pat.FindStringIndex(input)
 	if indices == nil {
 		return 0, input, nil
 	}
@@ -117,8 +146,8 @@ func parseEpochTime(input string) (Node, string, error) {
 }
 
 func parseIsoTime(input string) (Node, string, error) {
-	reIsoTime := regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}`)
-	indices := reIsoTime.FindStringIndex(input)
+	pat := regexp.MustCompile(`\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}`)
+	indices := pat.FindStringIndex(input)
 	if indices == nil {
 		return nil, input, nil
 	}

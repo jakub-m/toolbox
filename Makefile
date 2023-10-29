@@ -8,7 +8,7 @@ default: \
 
 
 bin/tscalc: $(shell find cli/tscalc -type f)
-	go build -o bin/tscalc cli/tscalc/main.go
+	go build -o bin/tscalc tscalc/cli/main.go
 bin/uniqcut: $(shell find cli/uniqcut -type f)
 	go build -o bin/uniqcut cli/uniqcut/main.go
 bin/cloudlogs-json-format: $(shell find cli/cloudlogs-json-format -type f)
