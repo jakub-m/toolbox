@@ -10,7 +10,7 @@ import (
 
 func GetParser() ParseFunc {
 	time_ := FirstOf(IsoTime, EpochTime)
-	return FirstOf(Addition(time_, Period), time_)
+	return FirstOf(Addition(time_, Period), Subtraction(time_, time_), time_)
 }
 
 type Node any
@@ -42,8 +42,35 @@ func Addition(leftParser, rightParser ParseFunc) ParseFunc {
 	}
 }
 
+type SubNode struct {
+	Left, Right Node
+}
+
+// Subtraction returns <time> - <time> parser. It takes care of the whitespace around - sign.
+func Subtraction(leftParser, rightParser ParseFunc) ParseFunc {
+	return func(input string) (Node, string, error) {
+		node, rest, err := Sequence(
+			ContinuedBy(leftParser, WhitespaceEOL),
+			ContinuedBy(RegexLiteral(`\-`), WhitespaceEOL),
+			rightParser,
+		)(input)
+		if err != nil || node == nil {
+			return node, rest, err
+		}
+		seq, ok := node.(SequenceNode)
+		if !(ok && len(seq) == 3) {
+			return nil, input, fmt.Errorf("BUG! Expected 3 element sequence in Subtraction, got: %v", seq)
+		}
+		return SubNode{seq[0], seq[2]}, rest, nil
+	}
+}
+
 type PeriodNode struct {
 	Seconds float64
+}
+
+func (n PeriodNode) String() string {
+	return fmt.Sprintf("%dsec", int64(n.Seconds))
 }
 
 func Period(input string) (Node, string, error) {

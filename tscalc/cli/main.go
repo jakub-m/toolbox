@@ -50,12 +50,15 @@ func handleLine(line string) (string, error) {
 		return "", err
 	}
 
-	node, ok := reduced.(parse.EpochTimeNode)
-	if !ok {
-		return "", fmt.Errorf("BUG! After reduction expected other node type, got %T: %v", reduced, reduced)
+	// Format output
+	switch n := reduced.(type) {
+	case parse.EpochTimeNode:
+		return n.FormatISO(), nil
+	case parse.PeriodNode:
+		return n.String(), nil
 	}
 
-	return node.FormatISO(), nil
+	return "", fmt.Errorf("BUG! After reduction expected other node type, got %T: %v", reduced, reduced)
 }
 
 func parseInput(input string) (parse.Node, error) {
@@ -86,6 +89,16 @@ func reduceTree(root parse.Node) (parse.Node, error) {
 			return nil, err
 		}
 		return addNodes(reducedLeft, reducedRight)
+	case parse.SubNode:
+		reducedLeft, err := reduceTree(node.Left)
+		if err != nil {
+			return nil, err
+		}
+		reducedRight, err := reduceTree(node.Right)
+		if err != nil {
+			return nil, err
+		}
+		return subNodes(reducedLeft, reducedRight)
 	default:
 		return nil, fmt.Errorf("BUG! Unexpected node type in reduceTree %T: %v", root, root)
 	}
@@ -101,6 +114,18 @@ func addNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
 		return nil, fmt.Errorf("BUG! Expected the right addition node to be period node, was %T: %v", rightNode, rightNode)
 	}
 	return parse.EpochTimeNode(float64(left) + right.Seconds), nil
+}
+
+func subNodes(leftNode, rightNode parse.Node) (parse.Node, error) {
+	left, ok := leftNode.(parse.EpochTimeNode)
+	if !ok {
+		return nil, fmt.Errorf("BUG! Expected the left subtraction node to be epoch time node, was %T: %v", leftNode, leftNode)
+	}
+	right, ok := rightNode.(parse.EpochTimeNode)
+	if !ok {
+		return nil, fmt.Errorf("BUG! Expected the right subtraction node to be period node, was %T: %v", rightNode, rightNode)
+	}
+	return parse.PeriodNode{Seconds: float64(left) - float64(right)}, nil
 }
 
 //func calcuate(expr string) (string, error) {
