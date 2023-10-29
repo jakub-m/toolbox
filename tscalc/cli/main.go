@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"lib/tscalc/parse"
 	"log"
 	"os"
@@ -15,11 +16,18 @@ func main() {
 		fmt.Fprintf(os.Stderr, `Usage: paste the timestamp or operations on timestamp at the input. If there is no operation, the timestamp will be converted between epoch seconds and UTC time.`)
 		flag.PrintDefaults()
 	}
+	var verbose bool
+	flag.BoolVar(&verbose, "v", false, "verbose")
 	flag.Parse()
 
-	if fi, err := os.Stdin.Stat(); err == nil {
-		// If stdin not opened, just print current time.
-		if fi.Size() == 0 {
+	if !verbose {
+		log.SetOutput(io.Discard)
+	}
+
+	if stat, err := os.Stdin.Stat(); err == nil {
+		if (stat.Mode() & os.ModeCharDevice) != 0 {
+			// If stdin not opened, just print current time.
+			log.Println("No stdin, print current time")
 			fmt.Printf("%s\n", parse.IsoTimeNode(time.Now()))
 			return
 		}
