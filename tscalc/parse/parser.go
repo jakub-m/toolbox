@@ -103,27 +103,6 @@ func Sequence(parsers ...ParseFunc) ParseFunc {
 	}
 }
 
-//
-//type EmptyNode struct{}
-//
-//// Optional retuns a dummy empty node if the parser does not parse
-//func Optional(parser ParseFunc) ParseFunc {
-//	return func(input string) (Node, string, error) {
-//		node, rest, err := parser(input)
-//		if err != nil {
-//			return node, rest, err
-//		}
-//		if node == nil {
-//			if rest == input {
-//				return EmptyNode{}, rest, nil
-//			} else {
-//				return nil, rest, fmt.Errorf("BUG! The parser in the optional node did not parse anything but consumed input")
-//			}
-//		}
-//		return node, rest, nil
-//	}
-//}
-
 type RegexLiteralNode struct{ match string }
 
 func RegexLiteral(pat string) ParseFunc {
@@ -234,4 +213,22 @@ func IsoTime(input string) (Node, string, error) {
 		return nil, input, fmt.Errorf("error while parsing %s: %w", input, err)
 	}
 	return IsoTimeNode(t), input[indices[1]:], nil
+}
+
+func Bracket(inner ParseFunc) ParseFunc {
+	return func(input string) (Node, string, error) {
+		node, rest, err := Sequence(
+			RegexLiteral(`\(\s*`),
+			inner,
+			RegexLiteral(`\s*\)`),
+		)(input)
+		if err != nil || node == nil {
+			return node, rest, err
+		}
+		seq := node.(SequenceNode)
+		if len(seq) != 3 {
+			return nil, input, fmt.Errorf("BUG! Sequenece in bracket should be of len 3, was %d", len(seq))
+		}
+		return seq[1], rest, nil
+	}
 }
