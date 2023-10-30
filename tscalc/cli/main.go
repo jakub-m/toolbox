@@ -80,7 +80,7 @@ func handleLine(line string) (string, error) {
 }
 
 func parseInput(input string) (parse.Node, error) {
-	root, rest, err := parse.GetParser()(input)
+	root, rest, err := parse.GetParser().Parse(input)
 	if err != nil {
 		return nil, err
 	}
