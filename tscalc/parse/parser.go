@@ -258,6 +258,22 @@ func Bracket(inner Parser) Parser {
 	return funcParser{pf}
 }
 
+// RefStr is used to build recursive parsers.
+type RefStr struct {
+	Parser Parser
+}
+
+func Ref() *RefStr {
+	return &RefStr{}
+}
+
+func (p *RefStr) Parse(input string) (Node, string, error) {
+	if p.Parser == nil {
+		return nil, input, fmt.Errorf("BUG! RefStr.Parse is nil")
+	}
+	return p.Parser.Parse(input)
+}
+
 // funcParser wraps function into a Parser.
 type funcParser struct {
 	pf func(input string) (Node, string, error)

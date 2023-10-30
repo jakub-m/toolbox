@@ -26,15 +26,3 @@ func TestBracketAdd(t *testing.T) {
 	assert.Equal(t, "", rest)
 	assert.Equal(t, node, AddNode{RegexLiteralNode{"aaa"}, RegexLiteralNode{"bbb"}})
 }
-
-// func TestBracketRecursive(t *testing.T) {
-// 	lit := RegexLiteral(`a`)
-
-// 	b := FirstOfWith(lit)
-// 	b = b.Or(b)
-// 	node, rest, err := Bracket(Addition(RegexLiteral(`aaa`), RegexLiteral(`bbb`)))("(aaa + bbb)")
-// 	assert.NoError(t, err)
-// 	assert.Equal(t, "", rest)
-// 	assert.Equal(t, node, AddNode{RegexLiteralNode{"aaa"}, RegexLiteralNode{"bbb"}})
-
-// }
