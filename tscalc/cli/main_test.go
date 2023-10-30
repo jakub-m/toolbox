@@ -16,6 +16,7 @@ func TestCalc(t *testing.T) {
 		{"1970-01-01T00:01:40+00:00", "100.000000"},
 		{"1970-01-01T00:00:00+00:00 + 1m40s", "1970-01-01T00:01:40+00:00"},
 		{"1970-01-01T00:01:40+00:00 - 1970-01-01T00:00:00+00:00", "1m40s"},
+		{"200 - 100", "1m40s"},
 	} {
 		t.Run(fmt.Sprintf("%s == %s", tc.input, tc.expected), func(t *testing.T) {
 			actual, err := handleLine(tc.input)
