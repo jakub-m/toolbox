@@ -29,6 +29,10 @@ func main() {
 }
 
 func marshall(d any, out io.Writer) error {
+	if d == nil {
+		fmt.Fprintf(out, "null")
+		return nil
+	}
 	switch value := d.(type) {
 	case map[any]any:
 		fmt.Fprintf(out, "{")
