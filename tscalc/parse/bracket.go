@@ -3,11 +3,11 @@ package parse
 import "fmt"
 
 func Bracket(inner Parser) Parser {
-	pf := func(input string) (Node, string, error) {
+	pf := func(input Cursor) (Node, Cursor, error) {
 		node, rest, err := Sequence(
-			RegexLiteral(`\(\s*`),
+			Regex(`\(\s*`),
 			inner,
-			RegexLiteral(`\s*\)`),
+			Regex(`\s*\)`),
 		).Parse(input)
 		if err != nil || node == nil {
 			return node, rest, err
@@ -19,5 +19,5 @@ func Bracket(inner Parser) Parser {
 		return seq[1], rest, nil
 	}
 	name := fmt.Sprintf("\"(\" %s \")\"", inner)
-	return funcParser{pf: pf, name: name}
+	return FuncParser{Fn: pf, Name: name}
 }

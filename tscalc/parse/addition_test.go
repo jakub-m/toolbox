@@ -8,25 +8,25 @@ import (
 )
 
 func TestAdditionLiterals(t *testing.T) {
-	addition := Addition(RegexLiteral(`a`), RegexLiteral(`b`))
-	node, rest, err := addition.Parse("a + b")
+	addition := Addition(Regex(`a`), Regex(`b`))
+	node, rest, err := addition.Parse(NewCursor("a + b"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
-	assert.Equal(t, AddNode{RegexLiteralNode{"a"}, RegexLiteralNode{"b"}}, node)
+	assert.True(t, rest.Ended())
+	assert.Equal(t, AddNode{LiteralNode("a"), LiteralNode("b")}, node)
 }
 
 func TestAdditionTimeAndPeriod(t *testing.T) {
 	addition := Addition(EpochTime, Period)
 
-	node, rest, err := addition.Parse("100 + 10s")
+	node, rest, err := addition.Parse(NewCursor("100 + 10s"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
+	assert.True(t, rest.Ended())
 	assert.Equal(t, AddNode{EpochTimeNode(100), PeriodNode(10 * time.Second)}, node)
 }
 
 func TestAddPeriods(t *testing.T) {
-	node, rest, err := Addition(Period, Period).Parse("10s + 10s")
+	node, rest, err := Addition(Period, Period).Parse(NewCursor("10s + 10s"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
+	assert.True(t, rest.Ended())
 	assert.Equal(t, AddNode{PeriodNode(10 * time.Second), PeriodNode(10 * time.Second)}, node)
 }

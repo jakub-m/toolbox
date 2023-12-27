@@ -7,8 +7,8 @@ default: \
 	bin/yamljson
 
 
-bin/tscalc: $(shell find tscalc/cli -type f)
-	go build -o bin/tscalc tscalc/cli/*
+bin/tscalc:
+	cd tscalc && $(MAKE) bin/tscalc
 bin/uniqcut: $(shell find uniqcut/cli -type f)
 	go build -o bin/uniqcut uniqcut/cli/*
 bin/cloudlogs-json-format: $(shell find cloudlogs-json-format/cli -type f)
@@ -22,4 +22,5 @@ bin/yamljson: $(shell find yamljson/cli -type f)
 test:
 	go test ./...
 clean:
+	cd tscalc && $(MAKE) clean
 	rm -frv bin/

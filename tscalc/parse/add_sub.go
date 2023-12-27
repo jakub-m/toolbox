@@ -12,7 +12,7 @@ func (n AddNode) String() string {
 
 // Addition returns <something> + <something else>. Addition parser takes care of whitespace.
 func Addition(leftParser, rightParser Parser) Parser {
-	pf := func(input string) (Node, string, error) {
+	pf := func(input Cursor) (Node, Cursor, error) {
 		Logf("Addition on: %s$", input)
 		LogIndentInc()
 		defer LogIndentDec()
@@ -31,7 +31,7 @@ func Addition(leftParser, rightParser Parser) Parser {
 		return AddNode{seq[0], seq[2]}, rest, nil
 	}
 	name := "(" + fmt.Sprintf("%s \"+\" %s", leftParser, rightParser) + ")"
-	return funcParser{pf: pf, name: name}
+	return FuncParser{Fn: pf, Name: name}
 }
 
 type SubNode struct {
@@ -44,7 +44,7 @@ func (n SubNode) String() string {
 
 // Subtraction returns <time> - <time> parser. It takes care of the whitespace around - sign.
 func Subtraction(leftParser, rightParser Parser) Parser {
-	pf := func(input string) (Node, string, error) {
+	pf := func(input Cursor) (Node, Cursor, error) {
 		Logf("Subtraction on: %s$", input)
 		LogIndentInc()
 		defer LogIndentDec()
@@ -63,5 +63,5 @@ func Subtraction(leftParser, rightParser Parser) Parser {
 		return SubNode{seq[0], seq[2]}, rest, nil
 	}
 	name := "(" + fmt.Sprintf("%s \"-\" %s", leftParser, rightParser) + ")"
-	return funcParser{pf: pf, name: name}
+	return FuncParser{Fn: pf, Name: name}
 }

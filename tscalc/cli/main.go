@@ -60,18 +60,44 @@ func handleLine(line string) (string, error) {
 		return "", err
 	}
 
-	// If the input is a plain value, then only convert the formats.
-	switch n := root.(type) {
-	case p.EpochTimeNode:
-		return fmt.Sprint(n.ToIsoTimeNode()), nil
-	case p.IsoTimeNode:
-		return fmt.Sprint(n.ToEpochTimeNode()), nil
-		// default:
-		// 	return "", fmt.Errorf("unexpected node type: %T", n)
+	// If there is a single element at the input, just convert the format.
+	if seq, ok := root.(p.SequenceNode); ok {
+		if nonEmpty := seq.RemoveEmpty(); len(nonEmpty) == 1 {
+			switch n := nonEmpty[0].(type) {
+			case p.EpochTimeNode:
+				return fmt.Sprint(n.ToIsoTimeNode()), nil
+			case p.IsoTimeNode:
+				return fmt.Sprint(n.ToEpochTimeNode()), nil
+			case p.LiteralNode:
+				if n == "NOW" {
+					return fmt.Sprint(p.IsoTimeNode(nowFunc())), nil
+				}
+			}
+		}
 	}
 
+	seq := root.(p.SequenceNode)
+	if len(seq) != 2 {
+		return "", fmt.Errorf("expected sequence of 2 elements, got: %s", seq)
+	}
+
+	acc := seq[0]
+	// Initial acc can be either term or [+=] period (a sequence). Here make it a single term.
+	if seq, ok := acc.(p.SequenceNode); ok {
+		if len(seq) == 2 {
+			literal := seq[0].(p.LiteralNode)
+			if literal == minus {
+				acc = p.PeriodNode(-1 * seq[1].(p.PeriodNode))
+			} else {
+				acc = seq[1]
+			}
+		}
+	}
+
+	reduced, err := reduce(acc, seq[1], nowFunc())
+
 	// When at the input there are more values, then perform the proper calculations.
-	reduced, err := reduceTree(root, nowFunc())
+	//reduced, err := reduce(root, nowFunc())
 	if err != nil {
 		return "", err
 	}
@@ -87,133 +113,118 @@ func handleLine(line string) (string, error) {
 func parseInput(input string) (p.Node, error) {
 	parser := getParser()
 	p.Logf("parser: %s", parser)
-	root, rest, err := parser.Parse(input)
+	root, rest, err := parser.Parse(p.NewCursor(input))
 	if err != nil {
 		return nil, err
 	}
-	if rest != "" {
+	if !rest.Ended() {
 		return nil, fmt.Errorf("failed to parse whole input, the reminder: %s", rest)
 	}
-	p.Logf("parsed: %T %s", root, root)
+	p.Logf("Input parsed to: %T %s", root, root)
 	return root, nil
 }
 
-/*
-getParser returns the parser of the following form:
-
-	<syntax> ::= <date-expr> | <period-expr>
-	<period-expr> ::= <period> | <period> "+" <period-expr> | <period> "-" <period-expr> | <date-expr> "-" <date-expr>
-	<date-expr> ::= <date> | <date> "+" <period-expr>
-*/
 func getParser() p.Parser {
-	periodExprRef := p.Ref()
-	periodExprRef.Name = "<period-expr>"
-	dateExprRef := p.Ref()
-	dateExprRef.Name = "<date-expr>"
+	plusMinus := p.RegexGroup(`\s*([+-])\s*`)
 
-	periodExpr := p.FirstOf(
-		p.Addition(p.Period, periodExprRef),
-		p.Subtraction(p.Period, periodExprRef),
-		p.Subtraction(dateExprRef, dateExprRef),
+	term := p.FirstOf(
 		p.Period,
-	)
-	periodExprRef.Parser = periodExpr
-
-	time_ := p.FirstOf(
 		p.IsoTime,
-		p.EpochTime,
 		p.Literal("NOW"),
+		p.EpochTime,
 	)
-
-	dateExpr := p.FirstOf(
-		p.Addition(time_, periodExpr),
-		p.Subtraction(time_, periodExpr),
-		time_,
+	signedTerm := p.Sequence(
+		plusMinus,
+		term,
 	)
-	dateExprRef.Parser = dateExpr
-
-	syntax := p.FirstOf(
-		periodExpr,
-		dateExpr,
+	syntax := p.Sequence(
+		p.FirstOf(
+			p.Sequence(
+				plusMinus,
+				p.Period,
+			),
+			term,
+		),
+		p.Optional(
+			p.Repeated(signedTerm),
+		),
 	)
-
 	return syntax
 }
 
-// reduceTree performs actual operations on nodes.
-func reduceTree(root p.Node, now time.Time) (p.Node, error) {
-	switch node := root.(type) {
-	case p.EpochTimeNode:
-		return node.ToIsoTimeNode(), nil
-	case p.IsoTimeNode, p.PeriodNode:
-		return node, nil
-	case p.AddNode:
-		reducedLeft, err := reduceTree(node.Left, now)
+// reduce performs actual operations on nodes.
+func reduce(acc p.Node, seq p.Node, now time.Time) (p.Node, error) {
+	log.Printf("Reduce: %s (%T) and %s (%T)", acc, acc, seq, seq)
+	for _, opTerm := range seq.(p.SequenceNode) {
+		opTermSeq := opTerm.(p.SequenceNode)
+		if len(opTermSeq) != 2 {
+			return nil, fmt.Errorf("expected two nodes, got %d: %s", len(opTermSeq), opTermSeq)
+		}
+		first := opTermSeq[0]
+		second := opTermSeq[1]
+		literal, ok := first.(p.LiteralNode)
+		if !ok {
+			return nil, fmt.Errorf("expected literal node, got %s (%T)", first, first)
+		}
+		combined, err := combine(acc, literal, second, nowFunc())
 		if err != nil {
 			return nil, err
 		}
-		reducedRight, err := reduceTree(node.Right, now)
-		if err != nil {
-			return nil, err
-		}
-		return addNodes(reducedLeft, reducedRight)
-	case p.SubNode:
-		reducedLeft, err := reduceTree(node.Left, now)
-		if err != nil {
-			return nil, err
-		}
-		reducedRight, err := reduceTree(node.Right, now)
-		if err != nil {
-			return nil, err
-		}
-		return subNodes(reducedLeft, reducedRight)
-	case p.LiteralNode:
-		switch node.Exact {
-		case "NOW":
-			return p.IsoTimeNode(now), nil
-		default:
-			return nil, fmt.Errorf("BUG! Unexpected literal: %s", node.Exact)
-		}
-
-	default:
-		return nil, fmt.Errorf("BUG! Unexpected node type in reduceTree %T: %v", root, root)
+		acc = combined
 	}
+	return acc, nil
 }
 
-func addNodes(leftNode, rightNode p.Node) (p.Node, error) {
-	right := rightNode.(p.PeriodNode)
+const (
+	plus  = "+"
+	minus = "-"
+)
+
+func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.Time) (p.Node, error) {
+	log.Printf("Combine %s (%T) %s %s (%T)", leftNode, leftNode, literal, rightNode, rightNode)
+	leftNode = forceIsoTime(leftNode, now)
+	rightNode = forceIsoTime(rightNode, now)
+
 	switch left := leftNode.(type) {
-	case p.IsoTimeNode:
-		return addNodesIsoTimePeriod(left, right)
 	case p.PeriodNode:
-		return addNodesPeriodPeriod(left, right)
-	default:
-		return nil, fmt.Errorf("BUG! Unexpected node type %T in addNodes", leftNode)
-	}
-}
-
-func addNodesIsoTimePeriod(left p.IsoTimeNode, right p.PeriodNode) (p.Node, error) {
-	return p.IsoTimeNode(time.Time(left).Add(time.Duration(right))), nil
-}
-
-func addNodesPeriodPeriod(left, right p.PeriodNode) (p.Node, error) {
-	return p.PeriodNode(time.Duration(left) + (time.Duration(right))), nil
-}
-
-func subNodes(leftNode, rightNode p.Node) (p.Node, error) {
-	switch left := leftNode.(type) {
-	case p.IsoTimeNode:
 		switch right := rightNode.(type) {
+		case p.PeriodNode:
+			switch literal {
+			case plus:
+				return p.PeriodNode(left + right), nil
+			case minus:
+				return p.PeriodNode(left - right), nil
+			}
 		case p.IsoTimeNode:
-			return p.PeriodNode(time.Time(left).Sub(time.Time(right))), nil
-		case p.PeriodNode:
-			return p.IsoTimeNode(time.Time(left).Add(0 - time.Duration(right))), nil
+			return p.IsoTimeNode(time.Time(right).Add(time.Duration(left))), nil
 		}
-	case p.PeriodNode:
+	case p.IsoTimeNode:
 		switch right := rightNode.(type) {
 		case p.PeriodNode:
-			return p.PeriodNode(time.Duration(left) - time.Duration(right)), nil
+			switch literal {
+			case plus:
+				return p.IsoTimeNode(time.Time(left).Add(time.Duration(right))), nil
+			case minus:
+				return p.IsoTimeNode(time.Time(left).Add(-1 * time.Duration(right))), nil
+			}
+		case p.IsoTimeNode:
+			switch literal {
+			case minus:
+				return p.PeriodNode(time.Time(left).Sub(time.Time(right))), nil
+			}
 		}
 	}
-	return nil, fmt.Errorf("BUG! unexpected note types in subNodes: %T and %T", leftNode, rightNode)
+	return nil, fmt.Errorf("cannot combine %s (%T) and %s and %s (%T)", leftNode, leftNode, literal, rightNode, rightNode)
+}
+
+func forceIsoTime(node p.Node, now time.Time) p.Node {
+	switch n := node.(type) {
+	case p.EpochTimeNode:
+		return n.ToIsoTimeNode()
+	case p.LiteralNode:
+		if n == "NOW" {
+			return p.IsoTimeNode(now)
+		}
+	}
+	return node
 }

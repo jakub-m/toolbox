@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"fmt"
 	"log"
 	"strings"
 )
@@ -8,6 +9,10 @@ import (
 var LogEnabled = false
 var indent = ""
 var logIndent = 0
+
+func init() {
+	updateIndent()
+}
 
 func Logf(fmt string, args ...any) {
 	if !LogEnabled {
@@ -27,6 +32,9 @@ func LogIndentDec() {
 }
 func updateIndent() {
 	if logIndent >= 0 {
-		indent = strings.Repeat(".", logIndent)
+		indent = fmt.Sprintf("%2d|%s", logIndent, strings.Repeat(" .", logIndent/2))
+		if logIndent%2 == 1 {
+			indent += " "
+		}
 	}
 }

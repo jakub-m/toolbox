@@ -7,22 +7,22 @@ import (
 )
 
 func TestBracketSimple(t *testing.T) {
-	node, rest, err := Bracket(RegexLiteral(`aaa`)).Parse("(aaa)")
+	node, rest, err := Bracket(Regex(`aaa`)).Parse(NewCursor("(aaa)"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
-	assert.Equal(t, node, RegexLiteralNode{"aaa"})
+	assert.True(t, rest.Ended())
+	assert.Equal(t, node, LiteralNode("aaa"))
 }
 
 func TestBracketEmbedded(t *testing.T) {
-	node, rest, err := Bracket(Bracket(RegexLiteral(`aaa`))).Parse("( ( aaa))")
+	node, rest, err := Bracket(Bracket(Regex(`aaa`))).Parse(NewCursor("( ( aaa))"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
-	assert.Equal(t, node, RegexLiteralNode{"aaa"})
+	assert.True(t, rest.Ended())
+	assert.Equal(t, node, LiteralNode("aaa"))
 }
 
 func TestBracketAdd(t *testing.T) {
-	node, rest, err := Bracket(Addition(RegexLiteral(`aaa`), RegexLiteral(`bbb`))).Parse("(aaa + bbb)")
+	node, rest, err := Bracket(Addition(Regex(`aaa`), Regex(`bbb`))).Parse(NewCursor("(aaa + bbb)"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
-	assert.Equal(t, node, AddNode{RegexLiteralNode{"aaa"}, RegexLiteralNode{"bbb"}})
+	assert.True(t, rest.Ended())
+	assert.Equal(t, node, AddNode{LiteralNode("aaa"), LiteralNode("bbb")})
 }

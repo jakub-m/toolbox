@@ -9,9 +9,9 @@ import (
 )
 
 func TestParsePeriod(t *testing.T) {
-	node, rest, err := Period.Parse("10s")
+	node, rest, err := Period.Parse(NewCursor("10s"))
 	assert.NoError(t, err)
-	assert.Equal(t, "", rest)
+	assert.True(t, rest.Ended())
 	assert.Equal(t, node, PeriodNode(10*time.Second))
 }
 

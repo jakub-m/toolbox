@@ -3,8 +3,8 @@ bin=bin/tscalc
 $(bin): test $(gofiles)
 	go build -o $(bin) cli/*.go
 test: $(gofiles)
-	go test -v ./...
+	go test ./...
 clean:
-	rm -fv bin
+	rm -frv bin/
 .phony: test clean
 
