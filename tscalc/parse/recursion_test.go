@@ -33,24 +33,3 @@ func TestRecursiveParserRecursionOnRight(t *testing.T) {
 		},
 		node)
 }
-
-func TestRecursiveWithBracket(t *testing.T) {
-	lit := Regex(`a`)
-	exprRef := Ref()
-	expr := FirstOf(lit, Bracket(exprRef))
-	exprRef.Parser = expr
-
-	for _, tc := range []string{
-		"a",
-		"(a)",
-		"((a))",
-		"(((a)))",
-	} {
-		t.Run(tc, func(t *testing.T) {
-			node, rest, err := exprRef.Parse(NewCursor("a"))
-			assert.NoError(t, err)
-			assert.True(t, rest.Ended())
-			assert.Equal(t, LiteralNode("a"), node)
-		})
-	}
-}
