@@ -52,6 +52,7 @@ func main() {
 					r = 0
 				}
 				fmt.Printf("%s^\n", strings.Repeat("_", r))
+				os.Exit(1)
 			}
 		}
 		fmt.Println(res)
