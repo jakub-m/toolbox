@@ -45,7 +45,7 @@ func main() {
 
 		if err != nil {
 			fmt.Println(err)
-			if nerr, ok := err.(p.NodeError); ok {
+			if nerr, ok := err.(p.CursorError); ok {
 				fmt.Println(nerr.Cursor().Input)
 				r := nerr.Cursor().Pos - 1
 				if r <= 0 {
@@ -126,7 +126,10 @@ func parseInput(input string) (p.Node, error) {
 		return nil, err
 	}
 	if !rest.Ended() {
-		return nil, fmt.Errorf("failed to parse whole input, the reminder: %s", rest)
+		return nil, cursorError{
+			err: fmt.Errorf("failed to parse whole input"),
+			cur: rest,
+		}
 	}
 	p.Logf("Input parsed to: %T %s", root, root)
 	return root, nil
@@ -189,7 +192,7 @@ const (
 	strNow   = "now"
 )
 
-func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.Time) (p.Node, p.NodeError) {
+func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.Time) (p.Node, p.CursorError) {
 	log.Printf("Combine %s (%T) %s %s (%T)", leftNode, leftNode, literal, rightNode, rightNode)
 	leftNode = forceIsoTime(leftNode, now)
 	rightNode = forceIsoTime(rightNode, now)
@@ -241,9 +244,9 @@ func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.
 			}
 		}
 	}
-	err := combineError{
-		node: leftNode,
-		err:  fmt.Errorf("cannot combine %s (%T) and %s and %s (%T)", leftNode, leftNode, literal, rightNode, rightNode),
+	err := cursorError{
+		cur: leftNode.Cursor(),
+		err: fmt.Errorf("cannot combine %s (%T) and %s and %s (%T)", leftNode, leftNode, literal, rightNode, rightNode),
 	}
 	return nil, err
 }
@@ -260,15 +263,15 @@ func forceIsoTime(node p.Node, now time.Time) p.Node {
 	return node
 }
 
-type combineError struct {
-	err  error
-	node p.Node
+type cursorError struct {
+	err error
+	cur p.Cursor
 }
 
-func (e combineError) Error() string {
+func (e cursorError) Error() string {
 	return e.err.Error()
 }
 
-func (e combineError) Cursor() p.Cursor {
-	return e.node.Cursor()
+func (e cursorError) Cursor() p.Cursor {
+	return e.cur
 }

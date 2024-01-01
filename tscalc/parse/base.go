@@ -11,9 +11,9 @@ type Node interface {
 	Cursor() Cursor
 }
 
-// NodeError is an interface of an error that has information about Cursor. This information can be used to print
+// CursorError is an interface of an error that has information about Cursor. This information can be used to print
 // helpful error messages.
-type NodeError interface {
+type CursorError interface {
 	error
 	Node
 }
