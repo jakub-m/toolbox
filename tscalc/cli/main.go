@@ -69,7 +69,7 @@ func handleLine(line string) (string, error) {
 			case p.IsoTimeNode:
 				return fmt.Sprint(n.ToEpochTimeNode()), nil
 			case p.LiteralNode:
-				if n == "NOW" {
+				if n == "now" {
 					return fmt.Sprint(p.IsoTimeNode(nowFunc())), nil
 				}
 			}
@@ -130,7 +130,7 @@ func getParser() p.Parser {
 	term := p.FirstOf(
 		p.Period,
 		p.IsoTime,
-		p.Literal("NOW"),
+		p.Literal("now"),
 		p.EpochTime,
 	)
 	signedTerm := p.Sequence(
@@ -222,7 +222,7 @@ func forceIsoTime(node p.Node, now time.Time) p.Node {
 	case p.EpochTimeNode:
 		return n.ToIsoTimeNode()
 	case p.LiteralNode:
-		if n == "NOW" {
+		if n == "now" {
 			return p.IsoTimeNode(now)
 		}
 	}

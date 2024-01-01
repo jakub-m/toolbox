@@ -31,16 +31,16 @@ func TestCalc(t *testing.T) {
 		{"200-100", "1m40s"},
 		{"200 - 100", "1m40s"},
 		{"100 - 1s", "1970-01-01T00:01:39+00:00"},
-		{"NOW - 1h", "1969-12-31T23:00:00+00:00"},
-		{"NOW - NOW", "0s"},
-		{"NOW - NOW + 1h", "1h0m0s"},
+		{"now - 1h", "1969-12-31T23:00:00+00:00"},
+		{"now - now", "0s"},
+		{"now - now + 1h", "1h0m0s"},
 		{"1s + 1s - 1s", "1s"},
 		{"1s - 1s + 1s", "1s"},
-		{"NOW - NOW - 4h + 1h", "-3h0m0s"},
-		{"NOW - 4h - NOW + 1h", "-3h0m0s"},
-		{"-4h + NOW - NOW + 1h", "-3h0m0s"},
-		{"-4h + NOW + 1h - NOW", "-3h0m0s"},
-		{"-4h + 1h + NOW - NOW", "-3h0m0s"},
+		{"now - now - 4h + 1h", "-3h0m0s"},
+		{"now - 4h - now + 1h", "-3h0m0s"},
+		{"-4h + now - now + 1h", "-3h0m0s"},
+		{"-4h + now + 1h - now", "-3h0m0s"},
+		{"-4h + 1h + now - now", "-3h0m0s"},
 	} {
 		t.Run(fmt.Sprintf("%s == %s", tc.input, tc.expected), func(t *testing.T) {
 			actual, err := handleLine(tc.input)
@@ -54,7 +54,7 @@ func TestNow(t *testing.T) {
 	nowFunc = func() time.Time {
 		return time.Unix(42, 0)
 	}
-	actual, err := handleLine("NOW")
+	actual, err := handleLine("now")
 	assert.NoError(t, err)
 	assert.Equal(t, "1970-01-01T00:00:42+00:00", actual)
 }
