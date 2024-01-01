@@ -31,7 +31,7 @@ func main() {
 		if (stat.Mode() & os.ModeCharDevice) != 0 {
 			// If stdin not opened, just print current time.
 			log.Println("No stdin, print current time")
-			fmt.Printf("%s\n", p.IsoTimeNode(nowFunc()))
+			fmt.Printf("%s\n", p.IsoTimeNode{Time: nowFunc()})
 			return
 		}
 	} else {
@@ -42,15 +42,23 @@ func main() {
 	for scanner.Scan() {
 		text := scanner.Text()
 		res, err := handleLine(text)
+
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println(err)
+			if nerr, ok := err.(p.NodeError); ok {
+				fmt.Println(nerr.Cursor().Input)
+				r := nerr.Cursor().Pos - 1
+				if r <= 0 {
+					r = 0
+				}
+				fmt.Printf("%s^\n", strings.Repeat("_", r))
+			}
 		}
 		fmt.Println(res)
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatalf("error: %v", err)
 	}
-
 }
 
 func handleLine(line string) (string, error) {
@@ -62,39 +70,39 @@ func handleLine(line string) (string, error) {
 
 	// If there is a single element at the input, just convert the format.
 	if seq, ok := root.(p.SequenceNode); ok {
-		if nonEmpty := seq.RemoveEmpty(); len(nonEmpty) == 1 {
-			switch n := nonEmpty[0].(type) {
+		if nonEmpty := seq.RemoveEmpty(); nonEmpty.Len() == 1 {
+			switch n := nonEmpty.Nodes[0].(type) {
 			case p.EpochTimeNode:
 				return fmt.Sprint(n.ToIsoTimeNode()), nil
 			case p.IsoTimeNode:
 				return fmt.Sprint(n.ToEpochTimeNode()), nil
 			case p.LiteralNode:
-				if n == "now" {
-					return fmt.Sprint(p.IsoTimeNode(nowFunc())), nil
+				if n.Literal == strNow {
+					return fmt.Sprint(p.IsoTimeNode{Time: nowFunc()}), nil
 				}
 			}
 		}
 	}
 
 	seq := root.(p.SequenceNode)
-	if len(seq) != 2 {
+	if seq.Len() != 2 {
 		return "", fmt.Errorf("expected sequence of 2 elements, got: %s", seq)
 	}
 
-	acc := seq[0]
+	acc := seq.Nodes[0]
 	// Initial acc can be either term or [+=] period (a sequence). Here make it a single term.
 	if seq, ok := acc.(p.SequenceNode); ok {
-		if len(seq) == 2 {
-			literal := seq[0].(p.LiteralNode)
-			if literal == minus {
-				acc = p.PeriodNode(-1 * seq[1].(p.PeriodNode))
+		if seq.Len() == 2 {
+			literal := seq.Nodes[0].(p.LiteralNode)
+			if literal.Literal == strMinus {
+				acc = p.PeriodNode{Duration: -1 * seq.Nodes[1].(p.PeriodNode).Duration}
 			} else {
-				acc = seq[1]
+				acc = seq.Nodes[1]
 			}
 		}
 	}
 
-	reduced, err := reduce(acc, seq[1], nowFunc())
+	reduced, err := reduce(acc, seq.Nodes[1], nowFunc())
 
 	// When at the input there are more values, then perform the proper calculations.
 	//reduced, err := reduce(root, nowFunc())
@@ -130,7 +138,7 @@ func getParser() p.Parser {
 	term := p.FirstOf(
 		p.Period,
 		p.IsoTime,
-		p.Literal("now"),
+		p.Literal(strNow),
 		p.EpochTime,
 	)
 	signedTerm := p.Sequence(
@@ -155,13 +163,13 @@ func getParser() p.Parser {
 // reduce performs actual operations on nodes.
 func reduce(acc p.Node, seq p.Node, now time.Time) (p.Node, error) {
 	log.Printf("Reduce: %s (%T) and %s (%T)", acc, acc, seq, seq)
-	for _, opTerm := range seq.(p.SequenceNode) {
+	for _, opTerm := range seq.(p.SequenceNode).Nodes {
 		opTermSeq := opTerm.(p.SequenceNode)
-		if len(opTermSeq) != 2 {
-			return nil, fmt.Errorf("expected two nodes, got %d: %s", len(opTermSeq), opTermSeq)
+		if opTermSeq.Len() != 2 {
+			return nil, fmt.Errorf("expected two nodes, got %d: %s", opTermSeq.Len(), opTermSeq)
 		}
-		first := opTermSeq[0]
-		second := opTermSeq[1]
+		first := opTermSeq.Nodes[0]
+		second := opTermSeq.Nodes[1]
 		literal, ok := first.(p.LiteralNode)
 		if !ok {
 			return nil, fmt.Errorf("expected literal node, got %s (%T)", first, first)
@@ -176,11 +184,12 @@ func reduce(acc p.Node, seq p.Node, now time.Time) (p.Node, error) {
 }
 
 const (
-	plus  = "+"
-	minus = "-"
+	strPlus  = "+"
+	strMinus = "-"
+	strNow   = "now"
 )
 
-func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.Time) (p.Node, error) {
+func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.Time) (p.Node, p.NodeError) {
 	log.Printf("Combine %s (%T) %s %s (%T)", leftNode, leftNode, literal, rightNode, rightNode)
 	leftNode = forceIsoTime(leftNode, now)
 	rightNode = forceIsoTime(rightNode, now)
@@ -189,32 +198,54 @@ func combine(leftNode p.Node, literal p.LiteralNode, rightNode p.Node, now time.
 	case p.PeriodNode:
 		switch right := rightNode.(type) {
 		case p.PeriodNode:
-			switch literal {
-			case plus:
-				return p.PeriodNode(left + right), nil
-			case minus:
-				return p.PeriodNode(left - right), nil
+			switch literal.Literal {
+			case strPlus:
+				return p.PeriodNode{
+					Duration: left.Duration + right.Duration,
+					Cur:      right.Cursor(),
+				}, nil
+			case strMinus:
+				return p.PeriodNode{
+					Duration: left.Duration - right.Duration,
+					Cur:      right.Cursor(),
+				}, nil
 			}
 		case p.IsoTimeNode:
-			return p.IsoTimeNode(time.Time(right).Add(time.Duration(left))), nil
+			return p.IsoTimeNode{
+				Time: right.Time.Add(left.Duration),
+				Cur:  right.Cursor(),
+			}, nil
 		}
 	case p.IsoTimeNode:
 		switch right := rightNode.(type) {
 		case p.PeriodNode:
-			switch literal {
-			case plus:
-				return p.IsoTimeNode(time.Time(left).Add(time.Duration(right))), nil
-			case minus:
-				return p.IsoTimeNode(time.Time(left).Add(-1 * time.Duration(right))), nil
+			switch literal.Literal {
+			case strPlus:
+				return p.IsoTimeNode{
+					Time: left.Time.Add(right.Duration),
+					Cur:  right.Cursor(),
+				}, nil
+			case strMinus:
+				return p.IsoTimeNode{
+					Time: left.Time.Add(-1 * right.Duration),
+					Cur:  right.Cursor(),
+				}, nil
 			}
 		case p.IsoTimeNode:
-			switch literal {
-			case minus:
-				return p.PeriodNode(time.Time(left).Sub(time.Time(right))), nil
+			switch literal.Literal {
+			case strMinus:
+				return p.PeriodNode{
+					Duration: left.Time.Sub(right.Time),
+					Cur:      right.Cur,
+				}, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("cannot combine %s (%T) and %s and %s (%T)", leftNode, leftNode, literal, rightNode, rightNode)
+	err := combineError{
+		node: leftNode,
+		err:  fmt.Errorf("cannot combine %s (%T) and %s and %s (%T)", leftNode, leftNode, literal, rightNode, rightNode),
+	}
+	return nil, err
 }
 
 func forceIsoTime(node p.Node, now time.Time) p.Node {
@@ -222,9 +253,22 @@ func forceIsoTime(node p.Node, now time.Time) p.Node {
 	case p.EpochTimeNode:
 		return n.ToIsoTimeNode()
 	case p.LiteralNode:
-		if n == "now" {
-			return p.IsoTimeNode(now)
+		if n.Literal == strNow {
+			return p.IsoTimeNode{Time: now, Cur: node.Cursor()}
 		}
 	}
 	return node
+}
+
+type combineError struct {
+	err  error
+	node p.Node
+}
+
+func (e combineError) Error() string {
+	return e.err.Error()
+}
+
+func (e combineError) Cursor() p.Cursor {
+	return e.node.Cursor()
 }

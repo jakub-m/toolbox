@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,17 +20,5 @@ func TestRecursiveParserRecursionOnRight(t *testing.T) {
 	node, rem, err := parser.Parse(NewCursor(input))
 	assert.NoError(t, err)
 	assert.True(t, rem.Ended())
-	assert.Equal(t,
-		SequenceNode{
-			LiteralNode("1"),
-			LiteralNode("+"),
-			SequenceNode{
-				LiteralNode("2"),
-				LiteralNode("+"),
-				SequenceNode{
-					LiteralNode("3"),
-				},
-			},
-		},
-		node)
+	assert.Equal(t, `["1" "+" ["2" "+" ["3"]]]`, fmt.Sprint(node))
 }

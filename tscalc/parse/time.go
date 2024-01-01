@@ -7,10 +7,17 @@ import (
 	"time"
 )
 
-type PeriodNode time.Duration
+type PeriodNode struct {
+	Duration time.Duration
+	Cur      Cursor
+}
+
+func (n PeriodNode) Cursor() Cursor {
+	return n.Cur
+}
 
 func (n PeriodNode) String() string {
-	return fmt.Sprint(time.Duration(n))
+	return fmt.Sprint(n.Duration)
 }
 
 type periodStr struct{}
@@ -33,10 +40,18 @@ func (p periodStr) Parse(input Cursor) (Node, Cursor, error) {
 		return nil, input, fmt.Errorf("error while parsing duration %s: %w", d, err)
 	}
 	rest := input.Advance(indices[1])
-	return PeriodNode(d), rest, nil
+	return PeriodNode{Duration: d, Cur: input}, rest, nil
 }
 
-type EpochTimeNode float64
+type EpochTimeNode struct {
+	// ts is epoch timestamp in seconds.
+	ts     float64
+	cursor Cursor
+}
+
+func (n EpochTimeNode) Cursor() Cursor {
+	return n.cursor
+}
 
 const isoFormat = "2006-01-02T15:04:05-07:00"
 
@@ -45,12 +60,13 @@ const isoFormat = "2006-01-02T15:04:05-07:00"
 // 	return time.Unix(int64(sec), int64(1_000_000_000*frac)).UTC().Format(isoFormat)
 // }
 
-func (t EpochTimeNode) ToIsoTimeNode() IsoTimeNode {
-	return IsoTimeNode(time.UnixMicro(int64(1_000_000 * float64(t))))
+func (n EpochTimeNode) ToIsoTimeNode() IsoTimeNode {
+	t := time.UnixMicro(int64(1_000_000 * float64(n.ts)))
+	return IsoTimeNode{Time: t, Cur: n.Cursor()}
 }
 
 func (n EpochTimeNode) String() string {
-	return fmt.Sprintf("%f", n)
+	return fmt.Sprintf("%f", n.ts)
 }
 
 var EpochTime = epochTimeStr{}
@@ -71,20 +87,27 @@ func (p epochTimeStr) Parse(input Cursor) (Node, Cursor, error) {
 	match := input.String()[indices[0]:indices[1]]
 	t, err := strconv.ParseFloat(match, 64)
 	if err != nil {
-		return 0, input, fmt.Errorf("error while parsing %s: %w", input, err)
+		return nil, input, fmt.Errorf("error while parsing %s: %w", input, err)
 	}
-	return EpochTimeNode(t), input.Advance(indices[1]), nil
+	return EpochTimeNode{ts: t, cursor: input}, input.Advance(indices[1]), nil
 }
 
-type IsoTimeNode time.Time
+type IsoTimeNode struct {
+	Time time.Time
+	Cur  Cursor
+}
+
+func (n IsoTimeNode) Cursor() Cursor {
+	return n.Cur
+}
 
 func (n IsoTimeNode) String() string {
-	return time.Time(n).UTC().Format(isoFormat)
+	return n.Time.UTC().Format(isoFormat)
 }
 
 func (n IsoTimeNode) ToEpochTimeNode() EpochTimeNode {
-	t := time.Time(n).Unix()
-	return EpochTimeNode(t)
+	ts := n.Time.Unix()
+	return EpochTimeNode{ts: float64(ts), cursor: n.Cursor()}
 }
 
 type isoTimeStr struct{}
@@ -106,5 +129,5 @@ func (p isoTimeStr) Parse(input Cursor) (Node, Cursor, error) {
 	if err != nil {
 		return nil, input, fmt.Errorf("error while parsing %s: %w", input, err)
 	}
-	return IsoTimeNode(t), input.Advance(indices[1]), nil
+	return IsoTimeNode{Time: t, Cur: input}, input.Advance(indices[1]), nil
 }

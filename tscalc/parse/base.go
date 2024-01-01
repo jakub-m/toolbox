@@ -5,7 +5,18 @@ import (
 	"strings"
 )
 
-type Node any
+type Node interface {
+	// Cursor method returns the cursor that can be used to find which part of the input contributed to the Node.
+	// This can be used for printing nice error messages pointing at the particular place in the input.
+	Cursor() Cursor
+}
+
+// NodeError is an interface of an error that has information about Cursor. This information can be used to print
+// helpful error messages.
+type NodeError interface {
+	error
+	Node
+}
 
 // Parser is not a pure function because there might be parsers that will have some minimal state.
 type Parser interface {
@@ -141,12 +152,16 @@ func (p optionalParser) String() string {
 	return fmt.Sprintf("(%s)?", p.parser)
 }
 
-var EmptyNode = &EmptyNodeType{}
+// EmptyNodeis the type of the `EmptyNode`. Usually it's more handy to use EmptyNode but in `switch...case...` you can use `EmptyNodeType`.
+type EmptyNode struct {
+	cursor Cursor
+}
 
-// EmptyNodeType is the type of the `EmptyNode`. Usually it's more handy to use EmptyNode but in `switch...case...` you can use `EmptyNodeType`.
-type EmptyNodeType struct{}
+func (n EmptyNode) Cursor() Cursor {
+	return n.cursor
+}
 
-func (n EmptyNodeType) String() string {
+func (n EmptyNode) String() string {
 	return "<nil>"
 }
 
@@ -159,7 +174,7 @@ func (p optionalParser) Parse(input Cursor) (Node, Cursor, error) {
 		return node, rest, err
 	}
 	if node == nil {
-		return EmptyNode, rest, nil
+		return EmptyNode{input}, rest, nil
 	}
 	return node, rest, err
 }

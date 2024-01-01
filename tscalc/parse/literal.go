@@ -3,16 +3,28 @@ package parse
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
-type LiteralNode string
+type LiteralNode struct {
+	Literal string
+	cursor  Cursor
+}
+
+func (n LiteralNode) String() string {
+	return strconv.Quote(n.Literal)
+}
+
+func (n LiteralNode) Cursor() Cursor {
+	return n.cursor
+}
 
 func Literal(exact string) Parser {
 	pf := func(input Cursor) (Node, Cursor, error) {
 		Logf("Literal(%s) on: %s$", exact, input)
 		if foundPrefix := strings.HasPrefix(input.String(), exact); foundPrefix {
-			return LiteralNode(exact), input.Advance(len(exact)), nil
+			return LiteralNode{Literal: exact, cursor: input}, input.Advance(len(exact)), nil
 		} else {
 			return nil, input, nil
 		}
@@ -43,7 +55,7 @@ func getRegexGroupParser(pat string, group int) Parser {
 		k := group * 2
 		match := input.String()[submatches[k]:submatches[k+1]]
 		Logf("Regex(%s) match: %s$", pat, match)
-		return LiteralNode(match), input.Advance(submatches[1]), nil
+		return LiteralNode{Literal: match, cursor: input}, input.Advance(submatches[1]), nil
 	}
 	name := fmt.Sprintf("/%s/", pat)
 	return FuncParser{Fn: pf, Name: name}

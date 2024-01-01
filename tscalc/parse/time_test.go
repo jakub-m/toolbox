@@ -13,7 +13,7 @@ func TestFormatTime(t *testing.T) {
 		t        IsoTimeNode
 		expected string
 	}{
-		{IsoTimeNode(time.Unix(0, 0)), "1970-01-01T00:00:00+00:00"},
+		{IsoTimeNode{Time: time.Unix(0, 0)}, "1970-01-01T00:00:00+00:00"},
 	} {
 		t.Run(fmt.Sprintf("%s==%s", tc.t, tc.expected), func(t *testing.T) {
 			assert.Equal(t, tc.expected, fmt.Sprint(tc.t))

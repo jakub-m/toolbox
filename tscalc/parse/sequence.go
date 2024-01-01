@@ -5,20 +5,31 @@ import (
 	"strings"
 )
 
-type SequenceNode []Node
+type SequenceNode struct {
+	Nodes  []Node
+	cursor Cursor
+}
+
+func (s SequenceNode) Cursor() Cursor {
+	return s.cursor
+}
+
+func (s SequenceNode) Len() int {
+	return len(s.Nodes)
+}
 
 func (s SequenceNode) String() string {
-	substrings := make([]string, len(s))
-	for i, n := range s {
+	substrings := make([]string, s.Len())
+	for i, n := range s.Nodes {
 		substrings[i] = fmt.Sprintf("%s", n)
 	}
-	return fmt.Sprintf("[%s]", strings.Join(substrings, ", "))
+	return fmt.Sprintf("[%s]", strings.Join(substrings, " "))
 }
 
 // Sequence returns a sequence if all the parsers successfully parse.
 func Sequence(parsers ...Parser) Parser {
 	pf := func(input Cursor) (Node, Cursor, error) {
-		seq := SequenceNode{}
+		nodes := []Node{}
 		Logf("Sequence of %d parsers on: %s$", len(parsers), input)
 		LogIndentInc()
 		defer LogIndentDec()
@@ -34,10 +45,10 @@ func Sequence(parsers ...Parser) Parser {
 			}
 			actualCur = rest
 			Logf("Sequence[%d/%d] match, rest: %s$", i+1, len(parsers), rest)
-			seq = append(seq, node)
+			nodes = append(nodes, node)
 			LogIndentDec()
 		}
-		return seq, actualCur, nil
+		return SequenceNode{Nodes: nodes, cursor: input}, actualCur, nil
 	}
 	parserStrings := make([]string, len(parsers))
 	for i := range parsers {
@@ -48,14 +59,15 @@ func Sequence(parsers ...Parser) Parser {
 }
 
 func (s SequenceNode) RemoveEmpty() SequenceNode {
-	filtered := SequenceNode{}
-	for _, n := range s {
-		if n == EmptyNode {
+	filtered := []Node{}
+	for _, n := range s.Nodes {
+		if _, ok := n.(EmptyNode); ok {
 			continue
 		}
 		filtered = append(filtered, n)
 	}
-	return filtered
+	s.Nodes = filtered
+	return s
 }
 
 type repeatedParser struct {
@@ -70,7 +82,7 @@ func (p repeatedParser) Parse(input Cursor) (Node, Cursor, error) {
 	Logf("Repeat %s", p.parser)
 	LogIndentInc()
 	defer LogIndentDec()
-	seq := SequenceNode{}
+	nodes := []Node{}
 	rest := input
 	for !rest.Ended() {
 		node, c, err := p.parser.Parse(rest)
@@ -81,7 +93,7 @@ func (p repeatedParser) Parse(input Cursor) (Node, Cursor, error) {
 		if node == nil {
 			break
 		}
-		seq = append(seq, node)
+		nodes = append(nodes, node)
 	}
-	return seq, rest, nil
+	return SequenceNode{Nodes: nodes, cursor: input}, rest, nil
 }
