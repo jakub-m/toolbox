@@ -26,6 +26,23 @@ func (s SequenceNode) String() string {
 	return fmt.Sprintf("[%s]", strings.Join(substrings, " "))
 }
 
+func Flatten(node Node) SequenceNode {
+	flat := []Node{}
+	if seq, ok := node.(SequenceNode); ok {
+		for _, s := range seq.Nodes {
+			s = Flatten(s)
+			if seq2, ok := s.(SequenceNode); ok {
+				flat = append(flat, seq2.Nodes...)
+			} else {
+				flat = append(flat, s)
+			}
+		}
+	} else {
+		flat = append(flat, node)
+	}
+	return SequenceNode{Nodes: flat, cursor: node.Cursor()}
+}
+
 // Sequence returns a sequence if all the parsers successfully parse.
 func Sequence(parsers ...Parser) Parser {
 	pf := func(input Cursor) (Node, Cursor, error) {

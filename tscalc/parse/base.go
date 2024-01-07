@@ -18,6 +18,26 @@ type CursorError interface {
 	Node
 }
 
+func NewCursorError(cur Cursor, e error) CursorError {
+	return someCursorError{
+		err: e,
+		cur: cur,
+	}
+}
+
+type someCursorError struct {
+	err error
+	cur Cursor
+}
+
+func (e someCursorError) Error() string {
+	return fmt.Sprintf("%s\n%s\n%s^^^", e.err.Error(), e.cur.Input, strings.Repeat(" ", e.cur.Pos))
+}
+
+func (e someCursorError) Cursor() Cursor {
+	return e.cur
+}
+
 // Parser is not a pure function because there might be parsers that will have some minimal state.
 type Parser interface {
 	// Parse returns the node if found, the remaining string and the error if any. If the node is not found, then
