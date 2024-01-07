@@ -45,44 +45,20 @@ func (n TypedNode) String() string {
 
 // Recursively flatten SequenceNode and TypedNode with SequenceNode, leaving only one top-level TypedNode with SequenceNode.
 // Mind it removes the type from TypeNode containing SequenceNode.
-func FlattenTyped(node Node) Node {
-	if typed, ok := node.(TypedNode); ok {
-		node := FlattenTyped(typed.Node)
-		if seq, ok := node.(SequenceNode); ok {
-			flat := []Node{}
-			flatten := FlattenTyped(seq)
-			if seq2, ok := flatten.(SequenceNode); ok {
-				flat = append(flat, seq2.Nodes...)
+func FlattenTyped(root Node) Node {
+	unpackTyped := func(node Node) any {
+		if typed, ok := node.(TypedNode); ok {
+			if seq, ok := typed.Node.(SequenceNode); ok {
+				return seq.Nodes
 			} else {
-				flat = append(flat, flatten)
+				return node
 			}
-			return SequenceNode{
-				Nodes:  flat,
-				cursor: seq.Cursor(),
-			}
-		} else if typed2, ok := node.(TypedNode); ok {
-			return typed2
+		} else if seq, ok := node.(SequenceNode); ok {
+			return seq.Nodes
 		} else {
-			return TypedNode{
-				Node: node,
-				Type: typed.Type,
-			}
+			return node
 		}
-	} else if seq, ok := node.(SequenceNode); ok {
-		flat := []Node{}
-		for _, el := range seq.Nodes {
-			el := FlattenTyped(el)
-			if seq2, ok := el.(SequenceNode); ok {
-				flat = append(flat, seq2.Nodes...)
-			} else {
-				flat = append(flat, el)
-			}
-		}
-		return SequenceNode{
-			Nodes:  flat,
-			cursor: seq.Cursor(),
-		}
-	} else {
-		return node
+
 	}
+	return FlattenFunc(root, unpackTyped)
 }
