@@ -42,23 +42,3 @@ func (n TypedNode) Cursor() Cursor {
 func (n TypedNode) String() string {
 	return fmt.Sprintf("(%s):%s", n.Node, n.Type)
 }
-
-// Recursively flatten SequenceNode and TypedNode with SequenceNode, leaving only one top-level TypedNode with SequenceNode.
-// Mind it removes the type from TypeNode containing SequenceNode.
-func FlattenTyped(root Node) Node {
-	unpackTyped := func(node Node) any {
-		if typed, ok := node.(TypedNode); ok {
-			if seq, ok := typed.Node.(SequenceNode); ok {
-				return seq.Nodes
-			} else {
-				return node
-			}
-		} else if seq, ok := node.(SequenceNode); ok {
-			return seq.Nodes
-		} else {
-			return node
-		}
-
-	}
-	return FlattenFunc(root, unpackTyped)
-}

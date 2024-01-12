@@ -10,7 +10,7 @@ func Parse(input string) (p.Node, error) {
 	if !cur.Ended() {
 		return nil, p.NewCursorError(cur, fmt.Errorf("did not parse whole input"))
 	}
-	node = p.Flatten(node)
+	node = p.FlattenNodeTyped(node)
 	return node, err
 }
 
@@ -29,24 +29,26 @@ func getParser() p.Parser {
 	lit_select := p.Typed(
 		p.Literal(`select`),
 		typeSelectLit)
-	selectorName := p.Typed(
+	selectorId := p.Typed(
 		p.Regex(`[*]|[0-9]+|[a-zA-Z][a-zA-Z0-9_]*`),
 		typeSelectorName,
 	)
-	selector := p.Typed(
-		p.FirstOf(
-			p.Sequence(selectorName,
-				p.Repeated(
-					p.Sequence(
-						whitespace,
-						p.Literal(","),
-						whitespace,
-						selectorName,
-					),
-				)),
-			selectorName,
-		),
-		typeSelector)
+	selector := p.Flat(
+		p.Typed(
+			p.FirstOf(
+				p.Sequence(
+					selectorId,
+					p.Repeated(
+						p.Sequence(
+							whitespace,
+							p.Literal(","),
+							whitespace,
+							selectorId,
+						),
+					)),
+				selectorId,
+			),
+			typeSelector))
 	lit_from := p.Typed(
 		p.Literal(`from`),
 		typeFromLit)

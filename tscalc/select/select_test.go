@@ -1,13 +1,13 @@
 package parse_sql
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParseSql(t *testing.T) {
-	t.Skip()
 	for _, tc := range []string{
 		// `select 1`,
 		// `select * from foo`,
@@ -16,5 +16,6 @@ func TestParseSql(t *testing.T) {
 		tree, err := Parse(tc)
 		assert.NoError(t, err)
 		assert.NotNil(t, tree)
+		assert.Equal(t, "", fmt.Sprint(tree)) // just to print
 	}
 }
