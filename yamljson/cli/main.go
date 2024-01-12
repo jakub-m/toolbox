@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v2"
 )
@@ -57,7 +58,7 @@ func marshall(d any, out io.Writer) error {
 		}
 		fmt.Fprintf(out, "]")
 	case string:
-		fmt.Fprintf(out, "\"%s\"", d)
+		fmt.Fprintf(out, "%s", strconv.Quote(value))
 	case bool:
 		if value {
 			fmt.Fprintf(out, "true")
