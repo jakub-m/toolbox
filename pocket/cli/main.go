@@ -87,15 +87,17 @@ func runCommandCopy(args []string) error {
 	if len(args) < 1 {
 		return fmt.Errorf("expected destination path as the positional argument")
 	}
-	pathTo := args[0]
+	dirTo := args[0]
 	paths, err := readStashedPaths()
 	if err != nil {
 		return fmt.Errorf("failed reading stashed paths: %w", err)
 	}
 	for _, pathFrom := range paths {
+		pathTo := path.Join(dirTo, path.Base(pathFrom))
 		err := cp.Copy(pathFrom, pathTo)
+		fmt.Fprintf(os.Stderr, "%s -> %s", pathFrom, pathTo)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to copy %s -> %s: %s", pathFrom, pathTo, err)
+			fmt.Fprintf(os.Stderr, "%s -> %s failed: %s", pathFrom, dirTo, err)
 			//... but don't abort, continue.
 		}
 	}
