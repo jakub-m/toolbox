@@ -9,18 +9,11 @@ import (
 	"path"
 	"slices"
 	"strings"
+
+	cp "github.com/otiai10/copy"
 )
 
 const defaultStashFilename = ".pocket.stash"
-
-const description = `To mark the files for further move or copy do
-
-	ls | pocket yank 
-
-To move the files later do
-
-	pocket move .
-`
 
 var commandNamesCopy = []string{"c", "cp", "copy"}
 var commandNamesMove = []string{"m", "mv", "move"}
@@ -82,16 +75,31 @@ func runCommandYank(args []string) error {
 }
 
 func runCommandPrint(args []string) error {
-	lines, err := readStashedLines()
+	paths, err := readStashedPaths()
 	if err != nil {
-		return fmt.Errorf("failed reading stashed lines: %w", err)
+		return fmt.Errorf("failed reading stashed paths: %w", err)
 	}
-	fmt.Println(strings.Join(lines, "\n"))
+	fmt.Println(strings.Join(paths, "\n"))
 	return nil
 }
 
 func runCommandCopy(args []string) error {
-	return fmt.Errorf("not implemented")
+	if len(args) < 1 {
+		return fmt.Errorf("expected destination path as the positional argument")
+	}
+	pathTo := args[0]
+	paths, err := readStashedPaths()
+	if err != nil {
+		return fmt.Errorf("failed reading stashed paths: %w", err)
+	}
+	for _, pathFrom := range paths {
+		err := cp.Copy(pathFrom, pathTo)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to copy %s -> %s: %s", pathFrom, pathTo, err)
+			//... but don't abort, continue.
+		}
+	}
+	return nil
 }
 
 func runCommandMove(args []string) error {
@@ -114,7 +122,7 @@ func normalizePaths(paths []string, pwd string) []string {
 	return normalized
 }
 
-func readStashedLines() ([]string, error) {
+func readStashedPaths() ([]string, error) {
 	p, err := getStashPath()
 	if err != nil {
 		return nil, fmt.Errorf("failed getting stash path: %w", err)
