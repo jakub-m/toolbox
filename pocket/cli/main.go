@@ -22,11 +22,9 @@ To move the files later do
 	pocket move .
 `
 
-var commandNamesMove = []string{"m", "mv", "move"}
 var commandNamesCopy = []string{"c", "cp", "copy"}
+var commandNamesMove = []string{"m", "mv", "move"}
 var commandNamesYank = []string{"y", "yank"}
-
-const defaultCommand = "yank"
 
 func main() {
 	err := mainerr()
@@ -35,11 +33,13 @@ func main() {
 	}
 }
 func mainerr() error {
-	command := defaultCommand
+	command := ""
 	args := os.Args
 	if len(args) > 1 {
 		command = os.Args[1]
 		args = args[2:]
+	} else {
+		args = args[1:]
 	}
 	if slices.Contains(commandNamesCopy, command) {
 		return runCommandCopy(args)
@@ -47,13 +47,15 @@ func mainerr() error {
 		return runCommandMove(args)
 	} else if slices.Contains(commandNamesYank, command) {
 		return runCommandYank(args)
+	} else if command == "" {
+		if isDataWaitingOnStdin() {
+			return runCommandYank(args)
+		} else {
+			return runCommandPrint(args)
+		}
 	} else {
 		return fmt.Errorf("unknown command %s", command)
 	}
-
-	// TODO yank recognised absolute and relative paths and applies pwd to relatives
-	// TODO move accepts -f flag to force move
-	// TODO copy command
 }
 
 func runCommandYank(args []string) error {
@@ -79,21 +81,21 @@ func runCommandYank(args []string) error {
 	return nil
 }
 
+func runCommandPrint(args []string) error {
+	lines, err := readStashedLines()
+	if err != nil {
+		return fmt.Errorf("failed reading stashed lines: %w", err)
+	}
+	fmt.Println(strings.Join(lines, "\n"))
+	return nil
+}
+
 func runCommandCopy(args []string) error {
 	return fmt.Errorf("not implemented")
 }
 
 func runCommandMove(args []string) error {
 	return fmt.Errorf("not implemented")
-}
-
-func readLines(r io.Reader) []string {
-	lines := []string{}
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		lines = append(lines, s.Text())
-	}
-	return lines
 }
 
 func normalizePaths(paths []string, pwd string) []string {
@@ -110,6 +112,19 @@ func normalizePaths(paths []string, pwd string) []string {
 		}
 	}
 	return normalized
+}
+
+func readStashedLines() ([]string, error) {
+	p, err := getStashPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed getting stash path: %w", err)
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return nil, fmt.Errorf("failed opening stash: %w", err)
+	}
+	defer f.Close()
+	return readLines(f), nil
 }
 
 func stashPaths(paths []string, stashFilePath string) error {
@@ -131,4 +146,18 @@ func getStashPath() (string, error) {
 		return "", err
 	}
 	return path.Join(p, defaultStashFilename), nil
+}
+
+func readLines(r io.Reader) []string {
+	lines := []string{}
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		lines = append(lines, s.Text())
+	}
+	return lines
+}
+
+func isDataWaitingOnStdin() bool {
+	stat, _ := os.Stdin.Stat()
+	return ((stat.Mode() & os.ModeCharDevice) == 0)
 }
