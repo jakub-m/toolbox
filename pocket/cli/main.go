@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -15,6 +16,25 @@ import (
 
 const defaultStashFilename = ".pocket.stash"
 
+const helpString = `
+pocket helps copying and moving files around. The basic usage is as follows
+
+	ls | pocket
+	pocket cp /some/destination
+	pocket mv /other/destination
+
+The possible commands are:
+
+yank
+	Stash the file names.
+
+copy
+	Copy the stashed files to destination.
+
+move
+	Move the stashed files to destination.
+`
+
 var commandNamesCopy = []string{"c", "cp", "copy"}
 var commandNamesMove = []string{"m", "mv", "move"}
 var commandNamesYank = []string{"y", "yank"}
@@ -26,6 +46,12 @@ func main() {
 	}
 }
 func mainerr() error {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s\n\n", strings.TrimSpace(helpString))
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
 	command := ""
 	args := os.Args
 	if len(args) > 1 {
@@ -88,24 +114,49 @@ func runCommandCopy(args []string) error {
 		return fmt.Errorf("expected destination path as the positional argument")
 	}
 	dirTo := args[0]
+	copy2 := func(from, to string) error {
+		return cp.Copy(from, to)
+	}
+	return forEachStashedPath(dirTo, copy2)
+}
+
+func runCommandMove(args []string) error {
+	if len(args) < 1 {
+		return fmt.Errorf("expected destination path as the positional argument")
+	}
+	dirTo := args[0]
+	return forEachStashedPath(dirTo, os.Rename)
+}
+
+func forEachStashedPath(destinationDir string, fn func(sourcePath, destinationPath string) error) error {
+	if err := ensurePathIsDirectory(destinationDir); err != nil {
+		return err
+	}
 	paths, err := readStashedPaths()
 	if err != nil {
 		return fmt.Errorf("failed reading stashed paths: %w", err)
 	}
 	for _, pathFrom := range paths {
-		pathTo := path.Join(dirTo, path.Base(pathFrom))
-		err := cp.Copy(pathFrom, pathTo)
-		fmt.Fprintf(os.Stderr, "%s -> %s", pathFrom, pathTo)
+		pathTo := path.Join(destinationDir, path.Base(pathFrom))
+		err := fn(pathFrom, pathTo)
+		fmt.Fprintf(os.Stderr, "%s -> %s\n", pathFrom, pathTo)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s -> %s failed: %s", pathFrom, dirTo, err)
+			fmt.Fprintf(os.Stderr, "%s -> %s failed: %s\n", pathFrom, destinationDir, err)
 			//... but don't abort, continue.
 		}
 	}
 	return nil
 }
 
-func runCommandMove(args []string) error {
-	return fmt.Errorf("not implemented")
+func ensurePathIsDirectory(path string) error {
+	if info, err := os.Stat(path); err != nil {
+		return fmt.Errorf("bad destination %s: %w", path, err)
+	} else {
+		if !info.IsDir() {
+			return fmt.Errorf("destination %s is not a directory", path)
+		}
+	}
+	return nil
 }
 
 func normalizePaths(paths []string, pwd string) []string {
