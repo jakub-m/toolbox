@@ -17,7 +17,7 @@ import (
 const defaultStashFilename = ".pocket.stash"
 
 const helpString = `
-pocket helps copying and moving files around. The basic usage is as follows
+pocket helps copying and moving files around. The basic usage is as follows:
 
 	ls | pocket
 	pocket cp /some/destination
@@ -33,6 +33,10 @@ copy
 
 move
 	Move the stashed files to destination.
+
+When no command is passed, the tool just prints the stashed paths. If no command is passed and something is piped to stdin, then "yank" is assumed.
+
+The stashed paths are stored in: %STASH_PATH%
 `
 
 var commandNamesCopy = []string{"c", "cp", "copy"}
@@ -47,7 +51,11 @@ func main() {
 }
 func mainerr() error {
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "%s\n\n", strings.TrimSpace(helpString))
+		stashPath := "?"
+		stashPath, _ = getStashPath()
+		s := strings.TrimSpace(helpString)
+		s = strings.ReplaceAll(s, "%STASH_PATH%", stashPath)
+		fmt.Fprintf(os.Stderr, "%s\n\n", s)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -78,9 +86,15 @@ func mainerr() error {
 }
 
 func runCommandYank(args []string) error {
+	fs := flag.NewFlagSet("yank", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s: yank the file paths. The files are taken from positional args or from stdin.\n\n", strings.Join(commandNamesYank, ", "))
+		fs.PrintDefaults()
+	}
+	fs.Parse(args)
 	var paths []string
-	if len(args) > 0 {
-		paths = args
+	if len(fs.Args()) > 0 {
+		paths = fs.Args()
 	} else {
 		paths = readLines(os.Stdin)
 	}
@@ -110,10 +124,17 @@ func runCommandPrint(args []string) error {
 }
 
 func runCommandCopy(args []string) error {
-	if len(args) < 1 {
+	fs := flag.NewFlagSet("copy", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s: copy stashed files and directories to the destination. The destination is passed as a positional argument.\n\n", strings.Join(commandNamesCopy, ", "))
+		fs.PrintDefaults()
+	}
+	fs.Parse(args)
+
+	if len(fs.Args()) < 1 {
 		return fmt.Errorf("expected destination path as the positional argument")
 	}
-	dirTo := args[0]
+	dirTo := fs.Args()[0]
 	copy2 := func(from, to string) error {
 		return cp.Copy(from, to)
 	}
@@ -121,10 +142,16 @@ func runCommandCopy(args []string) error {
 }
 
 func runCommandMove(args []string) error {
-	if len(args) < 1 {
+	fs := flag.NewFlagSet("move", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "%s: move stashed files and directories to the destination. The destination is passed as a positional argument.\n\n", strings.Join(commandNamesMove, ", "))
+		fs.PrintDefaults()
+	}
+	fs.Parse(args)
+	if len(fs.Args()) < 1 {
 		return fmt.Errorf("expected destination path as the positional argument")
 	}
-	dirTo := args[0]
+	dirTo := fs.Args()[0]
 	return forEachStashedPath(dirTo, os.Rename)
 }
 
