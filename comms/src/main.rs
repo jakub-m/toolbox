@@ -52,15 +52,28 @@ fn mainerr() -> Result<(), String> {
         &first_section_set & &second_section_set
     };
 
+    let mut printed_first = HashSet::new();
+    let mut printed_second = HashSet::new();
+    let mut printed_common = HashSet::new();
+
     for line in first_section.iter().chain(second_section.iter()) {
         if first_only.contains(line) {
-            println!("{}", line)
+            if !printed_first.contains(line) {
+                printed_first.insert(line);
+                println!("{}", line)
+            }
         }
         if second_only.contains(line) {
-            println!("\t{}", line)
+            if !printed_second.contains(line) {
+                printed_second.insert(line);
+                println!("\t{}", line)
+            }
         }
         if common.contains(line) {
-            println!("\t\t{}", line)
+            if !printed_common.contains(line) {
+                printed_common.insert(line);
+                println!("\t\t{}", line)
+            }
         }
     }
 
@@ -114,9 +127,11 @@ fn get_arguments() -> Result<Args, String> {
 
 fn print_help() {
     let message = "
-A version of [comm] command that works with a [s]ingle file (therefore \"comms\"). The input is split into two sections,
-separated by empty or blank lines. inputs The empty lines at the beginning and the end of the file are ignored. The
-content for parsing is taken from STDIN.
+A version of [comm] command that works with a [s]ingle file (therefore \"comms\"). The input is split into two sections, separated by empty or blank lines. inputs The empty lines at the beginning and the end of the file are ignored. The content for parsing is taken from STDIN.
+
+The sections do not need to be sorted, internally comms works on sets. The output is printed in the order of the original sections.
+
+The lines are printed only once, even if the same line appears many times.
 
 Usage: comms -[123]
 
@@ -137,7 +152,7 @@ fn collect_sections() -> Result<(Vec<String>, Vec<String>), String> {
     let mut first_section = vec![];
     let mut second_section = vec![];
 
-    for line in io::stdin().lock().lines() {
+    for (i_line, line) in io::stdin().lock().lines().enumerate() {
         let line = line.unwrap();
         if line.trim().is_empty() {
             // Empty line.
@@ -163,7 +178,8 @@ fn collect_sections() -> Result<(Vec<String>, Vec<String>), String> {
                 State::CollectingSecondSection => second_section.push(line),
                 State::Finished => {
                     return Err(format!(
-                        "Found non-empty line after the second section: {}",
+                        "Found non-empty line {} after the second section: {}",
+                        i_line + 1,
                         line
                     ))
                 }
