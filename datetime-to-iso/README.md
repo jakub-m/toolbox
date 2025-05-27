@@ -8,3 +8,9 @@ Convert python datetime string to ISO format.
 The code mostly done by Claude Code, as an experiment with generated code.
 
 Run tests with `./run_test.sh`
+
+## Installation
+
+```bash
+cargo install --path .
+```
