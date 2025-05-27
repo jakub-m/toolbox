@@ -1,2 +1,4 @@
-foo=datetime.datetime(2025, 5, 20, 8, 16, 5, 743193, tzinfo=datetime.timezone.utc) bar=bar
+single datetime: foo=datetime.datetime(2025, 5, 20, 8, 16, 5, 743193, tzinfo=datetime.timezone.utc) bar=bar
+two datetimes: foo=datetime.datetime(2025, 5, 20, 8, 16, 5, 743193, tzinfo=datetime.timezone.utc) datetime.datetime(2025, 5, 20, 8, 16, 5, 743193, tzinfo=datetime.timezone.utc) bar=bar
+no seconds: foo=datetime.datetime(2025, 5, 20, 8, 16, tzinfo=datetime.timezone.utc) bar=bar
 
