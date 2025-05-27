@@ -2,16 +2,15 @@
 
 set -eu
 
+input="src/testdata.txt"
 actual="tmp_test_output.txt"
-expected="src/testdata.out.txt"
-cargo run <src/testdata.txt >$actual
-d=$(diff -U0 $expected $actual)
+rm -fv $actual
+expected="src/testdata.txt.expected"
 
-if [[ -z "$d" ]]; then
-  >&2 echo "No diff, all good"
-  exit 0
+cargo run <$input >$actual
+if diff "$expected" "$actual"; then
+  >&2 echo "all good"
 else
-  >&2 echo "FAILED, diff!"
-  echo $d
-  exit 1
+  >&2 echo "FAILED. If this is the new status quo, then run"
+  >&2 echo "cargo run <$input >$expected"
 fi
