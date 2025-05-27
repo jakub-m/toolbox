@@ -8,7 +8,7 @@ Toolbox with small CLI utilities.
 - [cutcsv](scripting/cutcsv) - Use specific columns from CSV
 
 
-# `tscalc`
+# [`tscalc`](./tscalc)
 
 Basic calculations on times.
 
@@ -31,3 +31,8 @@ Works on timestamps as well:
 % echo "2023-10-29T19:42:44+00:00 - 1698603564.000000" | ./bin/tscalc
 1h23m20s
 ```
+
+
+# [`comms`][./comms]
+
+Like `comm` but working on a single file.
